@@ -2,3 +2,7 @@ langchain
 langchain-community
 chromadb
 ollama
+fastapi
+uvicorn
+langchain-openai
+pydantic
