@@ -11,7 +11,7 @@ from pydantic import BaseModel
 
 from langchain_community.vectorstores import Chroma
 from langchain_community.llms import Ollama as OllamaLLM
-from langchain_community.embeddings import OllamaEmbeddings
+from langchain_community.embeddings import OllamaEmbeddings, HuggingFaceEmbeddings
 from langchain.prompts import PromptTemplate
 from langchain.schema import BaseOutputParser
 
@@ -22,6 +22,9 @@ try:
 except Exception:
     HAS_OPENAI = False
 
+# Optional local HF text generation
+from transformers import pipeline, AutoTokenizer, AutoModelForSeq2SeqLM
+
 # Local modules
 import indexer as main_indexer
 import rag_alt.indexer as alt_indexer
@@ -30,11 +33,13 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 # Settings
-LLM_PROVIDER = os.getenv("LLM_PROVIDER", "OPENAI").upper()  # OPENAI | OLLAMA
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "HF").upper()  # HF | OPENAI | OLLAMA
 LLM_MODEL = os.getenv("LLM_MODEL", "gpt-4o-mini")  # For OPENAI
 EMBED_MODEL_OPENAI = os.getenv("EMBED_MODEL_OPENAI", "text-embedding-3-small")
 OLLAMA_LLM_MODEL = os.getenv("OLLAMA_LLM_MODEL", "tinyllama")
 OLLAMA_EMBED_MODEL = os.getenv("OLLAMA_EMBED_MODEL", "nomic-embed-text")
+HF_LLM_MODEL = os.getenv("HF_LLM_MODEL", "google/flan-t5-small")
+HF_EMBED_MODEL = os.getenv("HF_EMBED_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
 
 CHROMA_DIR_MAIN = os.getenv("CHROMA_DIR_MAIN", "/tmp/chroma_main")
 CHROMA_DIR_ALT = os.getenv("CHROMA_DIR_ALT", "/tmp/chroma_alt")
@@ -126,9 +131,30 @@ def build_embeddings_and_llm() -> Tuple[Any, Any]:
         emb = OpenAIEmbeddings(model=EMBED_MODEL_OPENAI)
         llm = ChatOpenAI(model=LLM_MODEL, temperature=0.6)
         return emb, llm
-    # OLLAMA
-    emb = OllamaEmbeddings(model=OLLAMA_EMBED_MODEL)
-    llm = OllamaLLM(model=OLLAMA_LLM_MODEL, temperature=0.7, num_predict=300, top_k=20, top_p=0.9)
+
+    if LLM_PROVIDER == "OLLAMA":
+        emb = OllamaEmbeddings(model=OLLAMA_EMBED_MODEL)
+        llm = OllamaLLM(model=OLLAMA_LLM_MODEL, temperature=0.7, num_predict=300, top_k=20, top_p=0.9)
+        return emb, llm
+
+    # HF local (gratuit)
+    emb = HuggingFaceEmbeddings(model_name=HF_EMBED_MODEL)
+    # Pipeline text2text (FLAN-T5)
+    text2text = pipeline(
+        "text2text-generation",
+        model=HF_LLM_MODEL,
+        tokenizer=HF_LLM_MODEL,
+    )
+
+    class HFLLMWrapper:
+        def __init__(self, pipe):
+            self.pipe = pipe
+
+        def invoke(self, prompt: str) -> str:
+            out = self.pipe(prompt, max_new_tokens=200, do_sample=True, temperature=0.7, top_p=0.9)
+            return out[0]["generated_text"]
+
+    llm = HFLLMWrapper(text2text)
     return emb, llm
 
 

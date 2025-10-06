@@ -12,7 +12,7 @@ Ce dossier contient l'API HTTP pour intégrer le RAG au site web client. Cette A
     - refresh (bool, défaut: false) — force la reconstruction de la pipeline (réindexation et rechargement)
   - Réponse:
     - response (str)
-    - provider (OPENAI ou OLLAMA)
+    - provider (HF | OPENAI | OLLAMA)
     - client_id, mode
 
 Exemple:
@@ -24,32 +24,34 @@ curl -X POST https://votre-service.onrender.com/api/chat \
 
 ## Choix du provider LLM/Embeddings
 
-Par défaut Render utilisera l'API OpenAI (recommandé). Vous pouvez basculer sur Ollama si vous auto-hébergez.
+Par défaut (gratuit), l'API utilise des modèles open-source locaux (Hugging Face) téléchargeables automatiquement:
+- LLM (génération): `google/flan-t5-small`
+- Embeddings: `sentence-transformers/all-MiniLM-L6-v2`
 
-- OPENAI (par défaut)
-  - Env vars:
-    - LLM_PROVIDER=OPENAI
-    - OPENAI_API_KEY=... (à configurer sur Render)
-    - LLM_MODEL=gpt-4o-mini (modifiable)
-    - EMBED_MODEL_OPENAI=text-embedding-3-small (modifiable)
+Variables d'environnement (déjà définies dans `render.yaml`):
+- LLM_PROVIDER=HF
+- HF_LLM_MODEL=google/flan-t5-small
+- HF_EMBED_MODEL=sentence-transformers/all-MiniLM-L6-v2
 
-- OLLAMA (si vous hébergez Ollama vous-même)
-  - Env vars:
-    - LLM_PROVIDER=OLLAMA
-    - OLLAMA_LLM_MODEL=tinyllama
-    - OLLAMA_EMBED_MODEL=nomic-embed-text
-  - Et un serveur Ollama accessible depuis l’API (non recommandé sur Render directement).
+Autres options (si besoin):
+- OPENAI (payant):
+  - LLM_PROVIDER=OPENAI
+  - OPENAI_API_KEY=...
+  - LLM_MODEL=gpt-4o-mini
+  - EMBED_MODEL_OPENAI=text-embedding-3-small
+- OLLAMA (auto-hébergement nécessaire):
+  - LLM_PROVIDER=OLLAMA
+  - OLLAMA_LLM_MODEL=tinyllama
+  - OLLAMA_EMBED_MODEL=nomic-embed-text
 
 ## Déploiement sur Render
 
 1) Connectez votre repo GitHub à Render.
 2) Render détectera `render.yaml`. Choisissez "Blueprint".
-3) Configurez les variables d'environnement dans Render:
-   - OPENAI_API_KEY (Sync: false)
-   - (optionnel) LLM_MODEL, EMBED_MODEL_OPENAI, LLM_PROVIDER
-4) Déployez.
+3) Déployez (aucune clé API requise en mode HF).
+4) Au premier appel, les modèles seront téléchargés et mis en cache sur l'instance.
 
-Le service utilisera la commande:
+Le service utilise la commande:
 ```
 uvicorn server.app:app --host 0.0.0.0 --port $PORT
 ```
@@ -72,7 +74,6 @@ CORS est ouvert par défaut (allow_origins=["*"]). Restreignez à vos domaines e
 
 ```
 pip install -r requirements.txt
-export OPENAI_API_KEY=sk-xxx
 uvicorn server.app:app --host 0.0.0.0 --port 8000 --reload
 ```
 
