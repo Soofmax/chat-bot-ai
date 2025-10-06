@@ -56,6 +56,10 @@ Exemples de requêtes:
 - Collection:
   - `CHROMA_COLLECTION_NAME = CLIENT_ID`
 
+## Remarque
+
+BMS Ventouse et BMS Logistique désignent le même client. Ce dépôt n'utilise qu'un profil unique: `clients/bms_ventouse/`.
+
 ## Ajouter un nouveau client
 
 1) Créer un nouveau dossier:
@@ -63,7 +67,7 @@ Exemples de requêtes:
 clients/mon_client/
 ```
 
-2) Copier et adapter le schéma JSON de `clients/bms_ventouse/data.json` (ou `clients/bms_logistique/data.json`) en conservant les clés suivantes au minimum:
+2) Copier et adapter le schéma JSON de `clients/bms_ventouse/data.json` en conservant les clés suivantes au minimum:
 - `entreprise` (nom, slogan, mission, valeurs, positioning)
 - `client_info` (cibles, contacts, zone d'intervention, horaires)
 - `services_detailles` (liste de services, description, détails)
