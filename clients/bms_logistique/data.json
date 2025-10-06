@@ -1,0 +1,59 @@
+{
+  "client_info": {
+    "name": "BMS Ventouse",
+    "slogan": "Solutions Logistiques Complètes pour Productions Audiovisuelles",
+    "target_audience": "Régisseurs de long métrage, de série, de publicité ou d’événementiel",
+    "contact_email": "bms.ventouse@gmail.com",
+    "contact_phone": "+33 6 46 00 56 42",
+    "website_url": "https://www.bmsventouse.fr/",
+    "contact_page_url": "https://www.bmsventouse.fr/contact/",
+    "whatsapp_url": "https://wa.me/33646005642",
+    "business_hours": "24/7",
+    "intervention_zone": "France entière, forte présence à Paris, Strasbourg, Nice, Marseille, Lyon, Bordeaux"
+  },
+
+  "ai_personality": {
+    "tone": "Professionnel, efficace, rassurant, B2B",
+    "keywords": ["solution", "fiabilité", "réactivité", "sécurité", "régie", "qualifié"],
+    "positioning": "Prix compétitifs et service complet — 'on s’occupe de tout'.",
+    "style_guidelines": [
+      "Réponse brève, claire, orientée solution (2–5 phrases).",
+      "Toujours proposer un CTA concret (devis, WhatsApp, téléphone).",
+      "Pas de tarif public: expliquer la valeur et proposer un devis rapide.",
+      "Ne jamais divulguer d’informations sensibles; rester factuel."
+    ],
+    "example_phrases": {
+      "positive_feedback": "Merci pour votre confiance. La satisfaction de nos régisseurs partenaires est notre priorité.",
+      "upsell_suggestion": "Nous proposons également des solutions complètes pour vos prochains tournages."
+    },
+    "signature": "— L’équipe BMS Ventouse"
+  },
+
+  "references": [
+    "Saison 2 de la série 'En Place' (Netflix)",
+    "Film 'Les Cadeaux' (Karé Productions)",
+    "Passage de la Flamme Olympique (Aubervilliers)",
+    "Parade 'On ne va pas se défiler !' (Conseil Régional Île-de-France)"
+  ],
+
+  "services": [
+    {
+      "name": "Ventousage & Stationnement",
+      "description": "Cœur de métier: réservation et neutralisation de stationnement pour tournages, événements (shootings, publicité, Fashion Week) et déménagements.",
+      "features": [
+        "Prise en charge des démarches administratives (Mairie/Préfecture)",
+        "Pose de panneaux & affichage riverains (offerts en cas de collaboration)",
+        "Roulettage & sécurisation de périmètre (offerts en cas de collaboration)"
+      ],
+      "faq": [
+        { "q": "Gérez-vous les autorisations avec la mairie ?", "a": "Oui, nous prenons en charge l’intégralité des démarches (AOT/OTDP, plans, affichage)." },
+        { "q": "Pouvez-vous intervenir en urgence ?", "a": "Oui, 24/7, selon périmètre et contraintes locales. Devis rapide." }
+      ],
+      "cta": {
+        "contact": "https://www.bmsventouse.fr/contact/",
+        "whatsapp": "https://wa.me/33646005642"
+      }
+    },
+    {
+      "name": "Sécurité Plateaux & Gardiennage",
+      "description": "
