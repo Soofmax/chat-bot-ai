@@ -122,7 +122,7 @@ def initialize_rag_system(client_data: Dict[str, Any]):
     
     # 1. Initialisation des modèles
     logger.info("Initialisation des modèles Ollama...")
-    embeddings = OllamaEmbeddings(model="tinyllama")
+    embeddings = OllamaEmbeddings(model="nomic-embed-text")
     llm = Ollama(
         model="tinyllama",
         temperature=0.7,  # Plus créatif pour compenser la petite taille
