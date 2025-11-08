@@ -192,7 +192,7 @@ def initialize_vector_store(documents: List[Document], collection_name: str, per
     
     logger.info("Création des embeddings avec Ollama...")
     
-    embeddings = OllamaEmbeddings(model="tinyllama")
+    embeddings = OllamaEmbeddings(model="nomic-embed-text")
     
     # Nettoyage de l'ancienne collection
     client = chromadb.PersistentClient(path=persist_directory)

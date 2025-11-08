@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: bms-rag-api
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn server.app:app --host 0.0.0.0 --port $PORT
+    autoDeploy: true
+    envVars:
+      - key: LLM_PROVIDER
+        value: HF
+      - key: HF_LLM_MODEL
+        value: google/flan-t5-small
+      - key: HF_EMBED_MODEL
+        value: sentence-transformers/all-MiniLM-L6-v2

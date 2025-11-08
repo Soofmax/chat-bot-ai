@@ -1,0 +1,88 @@
+{
+  "entreprise": {
+    "nom": "ACME Services",
+    "slogan": "Nous simplifions votre quotidien",
+    "mission": "Fournir des solutions fiables et rapides à nos clients",
+    "valeurs": ["fiabilité", "réactivité", "transparence"],
+    "positioning": "Service complet et flexible — orienté résultats"
+  },
+
+  "client_info": {
+    "target_audience": "Décideurs, opérationnels, directions",
+    "contact_email": "contact@acme.test",
+    "contact_phone": "+33 1 23 45 67 89",
+    "website_url": "https://www.acme.test",
+    "contact_page_url": "https://www.acme.test/contact",
+    "whatsapp_url": "https://wa.me/33123456789",
+    "business_hours": "9h-18h, du lundi au vendredi",
+    "intervention_zone": "France entière"
+  },
+
+  "services_detailles": [
+    {
+      "name": "Service principal A",
+      "description": "Description brève du service A",
+      "details": [
+        "Détail 1",
+        "Détail 2",
+        "Détail 3"
+      ]
+    },
+    {
+      "name": "Service principal B",
+      "description": "Description brève du service B",
+      "details": [
+        "Détail 1",
+        "Détail 2"
+      ]
+    }
+  ],
+
+  "ai_personality": {
+    "profile": "Assistant ACME — expert de votre domaine",
+    "tone": "Professionnel, clair, rassurant",
+    "communication_style": "Direct, orienté solutions, concis",
+    "vocabulaire_metier": {
+      "terms_techniques": ["terme1", "terme2", "terme3"],
+      "mots_puissants": ["fiabilité", "réactivité", "sécurité"]
+    },
+    "reponses_strategiques": {
+      "accueil_chaleureux": [
+        "Bonjour ! Assistant ACME à votre service. En quoi puis-je vous aider aujourd'hui ?"
+      ],
+      "relance_engageante": [
+        "Souhaitez-vous un échange rapide pour cadrer votre besoin ?"
+      ]
+    }
+  },
+
+  "references_prestigieuses": [
+    {
+      "projet": "Projet phare X",
+      "client": "Client notable",
+      "type": "Cas d'usage",
+      "specificite": "Contrainte spécifique traitée"
+    }
+  ],
+
+  "scenarios_critiques": {
+    "urgence": {
+      "declencheur": ["urgent", "demain", "imprévu"],
+      "reponse": "Urgence prise en compte — contact direct recommandé pour action immédiate",
+      "action": "redirection_immediate_humain",
+      "cta_prioritaire": "Appel recommandé"
+    },
+    "devis": {
+      "declencheur": ["devis", "prix", "budget"],
+      "reponse": "Tarifs personnalisés selon durée et périmètre — échange rapide pour une estimation précise ?",
+      "action": "proposition_contact_commercial",
+      "cta_prioritaire": "WhatsApp ou email"
+    }
+  },
+
+  "preuves_sociales": {
+    "temoignages_metier": [
+      "« ACME a répondu très rapidement et a réglé notre problème » — Responsable d'équipe"
+    ]
+  }
+}

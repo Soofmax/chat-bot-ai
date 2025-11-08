@@ -1,0 +1,12 @@
+langchain
+langchain-community
+chromadb
+ollama
+fastapi
+uvicorn
+langchain-openai
+pydantic
+transformers
+sentence-transformers
+accelerate
+torch
