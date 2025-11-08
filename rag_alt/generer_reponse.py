@@ -1,12 +1,13 @@
 import json
-import re
 import logging
-from typing import Dict, List, Any
+from typing import Dict, Any
+
 from langchain_community.vectorstores import Chroma
 from langchain_community.embeddings import OllamaEmbeddings
 from langchain_community.llms import Ollama
 from langchain.prompts import PromptTemplate
-from langchain.schema import BaseOutputParser
+
+from shared.generation import AdvancedOutputParser, ContextEnhancer, detect_scenario
 
 # Configuration (RAG séparé)
 CLIENT_ID = "template_client"  # Changez pour votre nouveau client
@@ -16,50 +17,6 @@ CHROMA_DB_DIRECTORY = "./rag_alt/chroma_db_alt"
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
-
-
-class AdvancedOutputParser(BaseOutputParser):
-    def __init__(self, brand_name: str):
-        self.brand_name = brand_name
-
-    def parse(self, text: str) -> str:
-        t = re.sub(r"\[.*?\]", "", text)
-        t = re.sub(r"\*+\s?", "", t)
-        t = re.sub(r"\n+", "\n", t)
-
-        # Supprime d'éventuelles sections de prompt leak
-        for marker in ["MISSION", "VOCABULAIRE", "#"]:
-            if marker in t:
-                parts = re.split(r"Réponse\s*:|\*\*Réponse\s*:?\*\*", t)
-                if len(parts) > 1:
-                    t = parts[-1].strip()
-
-        # Déduplique les phrases
-        sentences = [s.strip() for s in t.split(". ") if s.strip()]
-        uniq = []
-        for s in sentences:
-            if s not in uniq:
-                uniq.append(s)
-        res = ". ".join(uniq).strip()
-
-        if len(res) < 25:
-            return f"Merci pour votre message. L'équipe {self.brand_name} vous répond rapidement. Contact direct recommandé pour un devis ou une précision."
-
-        return res
-
-
-class ContextEnhancer:
-    def __init__(self, client_data: Dict):
-        self.client_data = client_data
-
-    def enhance_context(self, docs: List[Any]) -> str:
-        if not docs:
-            ent = self.client_data.get("entreprise", {})
-            return f"{ent.get('nom','Votre entreprise')} — {ent.get('slogan','')} | Services principaux disponibles. Contact 24/7 si précisé."
-        parts = []
-        for d in docs[:3]:
-            parts.append(d.page_content)
-        return "\n".join(parts)
 
 
 class ResponseQualityChecker:
@@ -122,19 +79,9 @@ Réponse:"""
     enhancer = ContextEnhancer(client_data)
     parser = AdvancedOutputParser(brand_name)
 
-    def detect_scenario(q: str) -> str:
-        ql = q.lower()
-        if any(k in ql for k in ["urgent", "demain", "crise", "last minute"]):
-            return "Urgence"
-        if any(k in ql for k in ["prix", "devis", "budget", "tarif"]):
-            return "Devis"
-        if any(k in ql for k in ["référence", "reference", "portfolio"]):
-            return "Références"
-        return "Question générale"
-
     def process(question: str) -> str:
         docs = retriever.get_relevant_documents(question)
-        context = enhancer.enhance_context(docs)
+        context = enhancer.enhance(docs)
         scen = detect_scenario(question)
         prompt_text = prompt.format(brand_name=brand_name, context=context, question=question, scenario=scen)
         raw = llm.invoke(prompt_text)

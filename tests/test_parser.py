@@ -1,6 +1,6 @@
 import re
 
-from server.app import AdvancedOutputParser
+from shared.generation import AdvancedOutputParser
 
 
 def test_parser_removes_prompt_leak_and_dedup():

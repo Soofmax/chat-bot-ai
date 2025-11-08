@@ -3,7 +3,7 @@ import json
 import re
 import logging
 import time
-from functools import lru_cache
+
 from typing import Dict, List, Any, Tuple
 from pathlib import Path
 
@@ -18,7 +18,7 @@ from langchain_community.vectorstores import Chroma
 from langchain_community.llms import Ollama as OllamaLLM
 from langchain_community.embeddings import OllamaEmbeddings, HuggingFaceEmbeddings
 from langchain.prompts import PromptTemplate
-from langchain.schema import BaseOutputParser
+
 
 # Optional OpenAI provider
 try:
@@ -28,11 +28,11 @@ except Exception:
     HAS_OPENAI = False
 
 # Optional local HF text generation
-from transformers import pipeline, AutoTokenizer, AutoModelForSeq2SeqLM
+from transformers import pipeline
 
-# Local modules
-import indexer as main_indexer
-import rag_alt.indexer as alt_indexer
+# Local modules (shared)
+from shared.generation import AdvancedOutputParser, ContextEnhancer, detect_scenario
+from shared.indexing import load_and_prepare_documents
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -62,53 +62,13 @@ os.makedirs(CHROMA_DIR_MAIN, exist_ok=True)
 os.makedirs(CHROMA_DIR_ALT, exist_ok=True)
 
 
-class AdvancedOutputParser(BaseOutputParser):
-    def __init__(self, brand_name: str):
-        self.brand_name = brand_name
-
-    def parse(self, text: str) -> str:
-        t = re.sub(r"\[.*?\]", "", text)
-        t = re.sub(r"\*+\s?", "", t)
-        t = re.sub(r"\n+", "\n", t)
-
-        for marker in ["MISSION", "VOCABULAIRE", "# "]:
-            if marker in t:
-                parts = re.split(r"Réponse\s*:|\*\*Réponse\s*:?\*\*", t)
-                if len(parts) > 1:
-                    t = parts[-1].strip()
-
-        sentences = [s.strip() for s in t.split(". ") if s.strip()]
-        uniq = []
-        for s in sentences:
-            if s not in uniq:
-                uniq.append(s)
-        res = ". ".join(uniq).strip()
-
-        if len(res) < 25:
-            return f"Merci pour votre message. L'équipe {self.brand_name} vous répond rapidement. Contact recommandé pour devis/précisions."
-        return res
 
 
-class ContextEnhancer:
-    def __init__(self, client_data: Dict):
-        self.client_data = client_data
-
-    def enhance(self, docs: List[Any]) -> str:
-        if not docs:
-            ent = self.client_data.get("entreprise", {})
-            return f"{ent.get('nom','Votre entreprise')} — {ent.get('slogan','')}"
-        return "\n".join([d.page_content for d in docs[:3]])
 
 
-def detect_scenario(q: str) -> str:
-    ql = q.lower()
-    if any(k in ql for k in ["urgent", "demain", "crise", "last minute"]):
-        return "Urgence"
-    if any(k in ql for k in ["prix", "devis", "budget", "tarif"]):
-        return "Devis"
-    if any(k in ql for k in ["référence", "reference", "portfolio"]):
-        return "Références"
-    return "Question générale"
+
+
+
 
 
 class Pipeline:
@@ -194,9 +154,7 @@ def load_client_data(mode: str, client_id: str) -> Dict[str, Any]:
 
 
 def build_documents(mode: str, client_data_path: str):
-    if mode == "alt":
-        return alt_indexer.load_and_prepare_documents(client_data_path)
-    return main_indexer.load_and_prepare_documents(client_data_path)
+    return load_and_prepare_documents(client_data_path)
 
 
 def build_pipeline(mode: str, client_id: str) -> Pipeline:
@@ -209,13 +167,13 @@ def build_pipeline(mode: str, client_id: str) -> Pipeline:
         persist_dir = os.path.join(base_dir, safe_id)
         collection = f"api_alt_{safe_id}"
         data_path = safe_client_path(mode, safe_id)
-        docs_loader = alt_indexer.load_and_prepare_documents
+        docs_loader = load_and_prepare_documents
     else:
         base_dir = CHROMA_DIR_MAIN
         persist_dir = os.path.join(base_dir, safe_id)
         collection = f"api_main_{safe_id}"
         data_path = safe_client_path(mode, safe_id)
-        docs_loader = main_indexer.load_and_prepare_documents
+        docs_loader = load_and_prepare_documents
 
     os.makedirs(persist_dir, exist_ok=True)
 
