@@ -1,0 +1,14 @@
+[tool.black]
+line-length = 100
+target-version = ["py311"]
+skip-string-normalization = true
+extend-exclude = """
+(
+  ^rag_alt/
+| ^server/
+| ^shared/
+| ^tests/
+| ^indexer\.py
+| ^generer_reponse\.py
+)
+"""
