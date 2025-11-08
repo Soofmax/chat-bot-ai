@@ -1,5 +1,5 @@
 # Locked top-level dependencies (pin exact versions)
-langchain==0.3.10
+langchain==0.3.27
 langchain-community==0.3.27
 langchain-text-splitters==0.3.9
 chromadb==0.5.3
