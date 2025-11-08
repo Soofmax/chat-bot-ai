@@ -21,21 +21,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 
-class ResponseQualityChecker:
-    """Vérifie la qualité des réponses générées"""
 
-    @staticmethod
-    def check_response_quality(response: str, min_length: int = 50) -> Dict[str, Any]:
-        checks = {
-            "has_signature": "BMS" in response or "Ventouse" in response,
-            "sufficient_length": len(response) >= min_length,
-            "has_contact_cta": any(keyword in response.lower() for keyword in
-                                   ['contact', 'appel', 'whatsapp', 'email', 'devis', 'disponible']),
-            "no_prompt_leak": not any(leak in response for leak in
-                                     ["MISSION", "VOCABULAIRE", "DIRECTIVES", "# 🎬"])
-        }
-        checks["all_passed"] = all(checks.values())
-        return checks
 
 
 def load_client_data() -> Dict[str, Any]:
@@ -163,9 +149,9 @@ def main():
                 print("\n🧠 Analyse en cours...")
 
                 response = process_query(avis_client)
-                quality_report = quality_checker.check_response_quality(response)
+                quality_report = quality_checker.check(response)
 
-                print(f"\n✅ RÉPONSE GÉNÉRÉE :")
+                print("\n✅ RÉPONSE GÉNÉRÉE :")
                 print(f"{'─'*50}")
                 print(response)
                 print(f"{'─'*50}")

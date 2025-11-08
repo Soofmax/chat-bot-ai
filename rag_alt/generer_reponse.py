@@ -20,20 +20,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 
-class ResponseQualityChecker:
-    def __init__(self, brand_name: str):
-        self.brand_name = brand_name
 
-    def check(self, response: str, min_length: int = 50) -> Dict[str, Any]:
-        rlower = response.lower()
-        checks = {
-            "has_brand": (self.brand_name.lower() in rlower) or ("contact" in rlower),
-            "sufficient_length": len(response) >= min_length,
-            "has_cta": any(k in rlower for k in ["contact", "appel", "whatsapp", "email", "devis", "disponible"]),
-            "no_prompt_leak": not any(k in response for k in ["MISSION", "VOCABULAIRE", "# "]),
-        }
-        checks["all_passed"] = all(checks.values())
-        return checks
 
 
 def load_client_data() -> Dict[str, Any]:

@@ -55,31 +55,31 @@ from .config import (
     RATE_LIMIT_KEY,
 )
 
+# Settings (centralisées)
+from .config import (
+    LLM_PROVIDER,
+    LLM_MODEL,
+    EMBED_MODEL_OPENAI,
+    OLLAMA_LLM_MODEL,
+    OLLAMA_EMBED_MODEL,
+    HF_LLM_MODEL,
+    HF_EMBED_MODEL,
+    CHROMA_DIR_MAIN,
+    CHROMA_DIR_ALT,
+    ALLOWED_ORIGINS,
+    API_KEYS,
+    RETRIEVER_K,
+    RETRIEVER_SCORE_THRESHOLD,
+    RATE_LIMIT_WINDOW_SEC,
+    RATE_LIMIT_MAX_REQ,
+    RATE_LIMIT_KEY,
+)
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 # Ensure dirs exist
-os.makedirs(CHROMA_DIR_MAIN, exist_ok=True)
-os.makedirs(CHROMA_DIR_ALT, exist_ok=True)
-
-
-
-
-
-
-
-
-
-
-
-class Pipeline:
-    def __init__(self, mode: str, client_id: str, client_data: Dict[str, Any], retriever, llm, prompt: PromptTemplate):
-        self.mode = mode
-        self.client_id = client_id
-        self.client_data = client_data
-        self.retriever = retriever
-        self.llm = llm
-        self.prompt = prompt
+os.makedirs(CHROMA_DIR_MAIN,ompt
         self.enhancer = ContextEnhancer(client_data)
         self.parser = AdvancedOutputParser(client_data.get("entreprise", {}).get("nom", "Votre entreprise"))
 
