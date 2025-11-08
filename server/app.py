@@ -4,7 +4,7 @@ import re
 import logging
 import time
 
-from typing import Dict, List, Any, Tuple
+from typing import Dict, Any, Tuple
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -35,9 +35,6 @@ from transformers import pipeline
 from shared.generation import AdvancedOutputParser, ContextEnhancer, detect_scenario
 from shared.indexing import load_and_prepare_documents
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
-logger = logging.getLogger(__name__)
-
 # Settings (centralisées)
 from .config import (
     LLM_PROVIDER,
@@ -57,6 +54,9 @@ from .config import (
     RATE_LIMIT_MAX_REQ,
     RATE_LIMIT_KEY,
 )
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+logger = logging.getLogger(__name__)
 
 # Ensure dirs exist
 os.makedirs(CHROMA_DIR_MAIN, exist_ok=True)

@@ -47,7 +47,7 @@ def initialize_rag(client_data: Dict[str, Any]):
     brand_name = client_data.get("entreprise", {}).get("nom", "Votre entreprise")
 
     embeddings = OllamaEmbeddings(model=OLLAMA_EMBED_MODEL)
-    llm = Ollama(model=OLLAMA_LLM_MODEL, temperature=0.7, num_predict=top_k=20, top_p=0.9)
+    llm = Ollama(model=OLLAMA_LLM_MODEL, temperature=0.7, num_predict=300, top_k=20, top_p=0.9)
 
     vectorstore = Chroma(
         collection_name=CHROMA_COLLECTION_NAME,

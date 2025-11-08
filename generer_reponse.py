@@ -75,7 +75,6 @@ def initialize_rag_system(client_data: Dict[str, Any]):
             "score_threshold": RETRIEVER_SCORE_THRESHOLD,
         },
     )
- )
 
     # 4. Template simplifié
     template = """Tu es l'assistant de BMS Ventouse, expert en logistique audiovisuelle.
