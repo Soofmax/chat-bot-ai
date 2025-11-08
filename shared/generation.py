@@ -2,10 +2,9 @@ import re
 from typing import List, Dict, Any
 
 from langchain.prompts import PromptTemplate
-from langchain.schema import BaseOutputParser
 
 
-class AdvancedOutputParser(BaseOutputParser):
+class AdvancedOutputParser:
     def __init__(self, brand_name: str):
         self.brand_name = brand_name
 

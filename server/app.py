@@ -180,7 +180,7 @@ def build_pipeline(mode: str, client_id: str) -> Pipeline:
     # Ouvrir la collection existante si possible
     try:
         vectorstore = Chroma(
-            embedding=emb,
+            embedding_function=emb,
             collection_name=collection,
             persist_directory=persist_dir,
         )
