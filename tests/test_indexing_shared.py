@@ -1,5 +1,4 @@
 import json
-from pathlib import Path
 
 from shared.indexing import load_and_prepare_documents
 

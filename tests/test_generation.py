@@ -1,5 +1,3 @@
-import pytest
-
 from shared.generation import detect_scenario, ResponseQualityChecker
 
 

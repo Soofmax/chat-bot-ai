@@ -1,8 +1,6 @@
 import re
 from typing import List, Dict, Any
 
-from langchain.prompts import PromptTemplate
-
 
 class AdvancedOutputParser:
     def __init__(self, brand_name: str):
