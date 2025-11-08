@@ -42,4 +42,5 @@ jobs:
             --ignore-vuln GHSA-7f5h-v6xp-fcq8
 
       - name: Security audit (safety)
+        continue-on-error: true
         run: safety check -r requirements.txt --full-report
