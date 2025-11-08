@@ -20,3 +20,8 @@ API_KEYS = set(x.strip() for x in os.getenv("API_KEYS", "").split(",") if x.stri
 # Retrieval settings
 RETRIEVER_K = int(os.getenv("RETRIEVER_K", "3"))
 RETRIEVER_SCORE_THRESHOLD = float(os.getenv("RETRIEVER_SCORE_THRESHOLD", "0.3"))
+
+# Rate limiting (basic in-memory)
+RATE_LIMIT_WINDOW_SEC = int(os.getenv("RATE_LIMIT_WINDOW_SEC", "60"))
+RATE_LIMIT_MAX_REQ = int(os.getenv("RATE_LIMIT_MAX_REQ", "60"))
+RATE_LIMIT_KEY = os.getenv("RATE_LIMIT_KEY", "ip")  # "ip" or "apikey"

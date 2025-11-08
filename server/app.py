@@ -2,6 +2,7 @@ import os
 import json
 import re
 import logging
+import time
 from functools import lru_cache
 from typing import Dict, List, Any, Tuple
 from pathlib import Path
@@ -51,6 +52,9 @@ from .config import (
     API_KEYS,
     RETRIEVER_K,
     RETRIEVER_SCORE_THRESHOLD,
+    RATE_LIMIT_WINDOW_SEC,
+    RATE_LIMIT_MAX_REQ,
+    RATE_LIMIT_KEY,
 )
 
 # Ensure dirs exist
@@ -275,7 +279,7 @@ def get_pipeline(mode: str, client_id: str) -> Pipeline:
 app = FastAPI(title="RAG API", version="1.0.0")
 
 # CORS (piloté par env)
-_allowed = [o.strip() for o in ALLOWED_ORIGINS.split(",")] if else []
+_allowed = [o.strip() for o in ALLOWED_ORIGINS.split(",")] if ALLOWED_ORIGINS else []
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_allowed if _allowed else ["*"],
@@ -303,15 +307,36 @@ app.add_middleware(SecurityHeadersMiddleware)
 def healthz():
     return {"status": "ok"}
 
-# Auth API key (si configurée)
+# Rate limiting storage (in-memory)
+RL_BUCKETS: Dict[str, Tuple[float, int]] = {}
+
+def _rate_limit_key(request, api_key: str) -> str:
+    if RATE_LIMIT_KEY.lower() == "apikey" and api_key:
+        return f"ak:{api_key}"
+    # fallback to IP
+    client_ip = getattr(request.client, "host", "unknown")
+    return f"ip:{client_ip}"
+
+# Auth API key + rate limit (si configurée)
 @app.middleware("http")
 async def require_api_key(request, call_next):
-    if request.url.path.startswith("/api/"):
+    if request.url.path.startswith("/api/") or request.url.path.startswith("/v1/"):
         auth = request.headers.get("Authorization", "")
         api_key = auth.split(" ", 1)[1] if auth.startswith("Bearer ") else ""
-        # Si des clés sont configurées, les exiger
+        # Auth (optionnel)
         if API_KEYS and (not api_key or api_key not in API_KEYS):
             return JSONResponse({"error": "Unauthorized"}, status_code=401)
+        # Rate limit
+        key = _rate_limit_key(request, api_key)
+        now = time.time()
+        bucket = RL_BUCKETS.get(key)
+        if not bucket or (now - bucket[0]) >= RATE_LIMIT_WINDOW_SEC:
+            RL_BUCKETS[key] = (now, 1)
+        else:
+            count = bucket[1] + 1
+            if count > RATE_LIMIT_MAX_REQ:
+                return JSONResponse({"error": "Too Many Requests"}, status_code=429)
+            RL_BUCKETS[key] = (bucket[0], count)
     return await call_next(request)
 
 
@@ -322,8 +347,7 @@ class ChatRequest(BaseModel):
     refresh: bool = False  # reconstruire la pipeline
 
 
-@app.post("/api/chat")
-def chat(req: ChatRequest):
+def _handle_chat(req: ChatRequest) -> Dict[str, Any]:
     if req.mode not in {"main", "alt"}:
         return {"error": "mode invalide. Utilisez 'main' ou 'alt'."}
 
@@ -359,5 +383,13 @@ def chat(req: ChatRequest):
     except FileNotFoundError:
         return {"error": f"Fichier client introuvable pour {safe_id} en mode {req.mode}."}
     except Exception as e:
-        logger.error(f"Erreur /api/chat: {e}")
+        logger.error(f"Erreur /chat: {e}")
         return {"error": "Erreur serveur"}
+
+@app.post("/api/chat")
+def chat(req: ChatRequest):
+    return _handle_chat(req)
+
+@app.post("/v1/chat")
+def chat_v1(req: ChatRequest):
+    return _handle_chat(req)

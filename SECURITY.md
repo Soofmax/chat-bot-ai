@@ -19,8 +19,8 @@ This project aims to be production-grade and security-conscious. Below are key c
 - Security headers
   - HSTS (HTTPS required), X-Content-Type-Options, X-Frame-Options, Referrer-Policy, CSP (default-src 'none', no framing).
 
-- Rate limiting (recommended)
-  - Add `starlette-limiter` (Redis) or equivalent in front proxy (NGINX/API Gateway) for DoS protection.
+- Rate limiting (basic in-memory enabled)
+  - Default in-memory per-IP or per-API key limiter. For production or multi-instance deployments, add `starlette-limiter` (Redis) or proxy rate limiting for robustness.
 
 - Logging and PII
   - Avoid logging PII. Phone/email in client JSON must be treated as sensitive.

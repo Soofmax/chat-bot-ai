@@ -24,10 +24,35 @@ Authorization: Bearer <YOUR_API_KEY>
 
 ### Chat
 
-- `POST /api/chat`
+- `POST /v1/chat` (recommended)
+- `POST /api/chat` (legacy alias)
 - Body (JSON):
   - `question` (string, required)
-  - `client_id` (string, default: "bms_ventouse") — validated by regex `^[a-zA-Z0-9_-]{1,64}$`
+  - `client_id` (string, default: "bms_ventouse") — validated by regex `^[a-zA-Z0-9_-]{1,64}# API Documentation
+
+## Base URL
+- Local development: `http://localhost:8000`
+- Production (Render): `https://<your-service>.onrender.com`
+
+## Authentication
+
+If `API_KEYS` is configured, all `/api/*` endpoints require:
+
+```
+Authorization: Bearer <YOUR_API_KEY>
+```
+
+## Endpoints
+
+### Health Check
+
+- `GET /healthz`
+- Response:
+```json
+{"status":"ok"}
+```
+
+
   - `mode` ("main" | "alt", default: "main")
   - `refresh` (boolean, default: false) — rebuild pipeline and vectorstore
 - Response (JSON):
@@ -37,7 +62,7 @@ Authorization: Bearer <YOUR_API_KEY>
 
 Example:
 ```bash
-curl -X POST http://localhost:8000/api/chat \
+curl -X POST http://localhost:8000/v1/chat \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer <YOUR_API_KEY>" \
   -d '{"question":"Urgence tournage demain à Paris","client_id":"bms_ventouse","mode":"main"}'
