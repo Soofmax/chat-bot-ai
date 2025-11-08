@@ -3,14 +3,16 @@ import json
 import re
 import logging
 import time
+import uuid
+import contextvars
 
 from typing import Dict, Any, Tuple
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from starlette.middleware.base import BaseHTTPMiddleware
 
 import chromadb
@@ -30,12 +32,37 @@ except Exception:
 # Optional local HF text generation
 from transformers import pipeline
 
+# Optional JSON logging formatter
+try:
+    from pythonjsonlogger import jsonlogger
+    HAS_JSON_LOGGER = True
+except Exception:
+    HAS_JSON_LOGGER = False
+
+# Optional Prometheus instrumentation
+try:
+    from prometheus_fastapi_instrumentator import Instrumentator
+    HAS_PROM = True
+except Exception:
+    HAS_PROM = False
+
+# Optional Redis-backed rate limiter (SlowAPI)
+try:
+    from slowapi import Limiter, _rate_limit_exceeded_handler
+    from slowapi.errors import RateLimitExceeded
+    from slowapi.util import get_remote_address
+    from slowapi.middleware import SlowAPIMiddleware
+    HAS_SLOWAPI = True
+except Exception:
+    HAS_SLOWAPI = False
+
 # Local modules (shared)
 from shared.generation import AdvancedOutputParser, ContextEnhancer, detect_scenario
 from shared.indexing import load_and_prepare_documents
 
 # Settings (centralisées)
 from .config import (
+    ENV,
     LLM_PROVIDER,
     LLM_MODEL,
     EMBED_MODEL_OPENAI,
@@ -52,9 +79,29 @@ from .config import (
     RATE_LIMIT_WINDOW_SEC,
     RATE_LIMIT_MAX_REQ,
     RATE_LIMIT_KEY,
+    REDIS_URL,
+    RATE_LIMIT_RULE,
+    API_KEYS_MAP,
 )
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+# Correlation ID via contextvar
+REQUEST_ID_CTX = contextvars.ContextVar("request_id", default="")
+
+def _configure_logging():
+    logger_ = logging.getLogger()
+    level = logging.INFO
+    logger_.setLevel(level)
+    for h in list(logger_.handlers):
+        logger_.removeHandler(h)
+    handler = logging.StreamHandler()
+    if HAS_JSON_LOGGER:
+        formatter = jsonlogger.JsonFormatter("%(asctime)s %(levelname)s %(name)s %(message)s %(request_id)s")
+    else:
+        formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s - rid=%(request_id)s")
+    handler.setFormatter(formatter)
+    logger_.addHandler(handler)
+
+_configure_logging()
 logger = logging.getLogger(__name__)
 
 # Ensure dirs exist
@@ -219,6 +266,17 @@ def get_pipeline(mode: str, client_id: str) -> Pipeline:
 # FastAPI app
 app = FastAPI(title="RAG API", version="1.0.0")
 
+# Correlation ID middleware
+class CorrelationIdMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        rid = request.headers.get("X-Request-ID") or str(uuid.uuid4())
+        REQUEST_ID_CTX.set(rid)
+        response = await call_next(request)
+        response.headers["X-Request-ID"] = rid
+        return response
+
+app.add_middleware(CorrelationIdMiddleware)
+
 # CORS (piloté par env)
 _allowed = [o.strip() for o in ALLOWED_ORIGINS.split(",")] if ALLOWED_ORIGINS else []
 app.add_middleware(
@@ -242,47 +300,122 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 app.add_middleware(SecurityHeadersMiddleware)
 
+# Startup gating: exigences production
+@app.on_event("startup")
+async def _startup_checks():
+    # Sentry (optionnel)
+    try:
+        dsn = os.getenv("SENTRY_DSN", "")
+        if dsn:
+            import sentry_sdk  # type: ignore
+            sentry_sdk.init(dsn=dsn, traces_sample_rate=float(os.getenv("SENTRY_TRACES_SAMPLE_RATE", "0.0")))
+            logger.info("Sentry initialisé")
+    except Exception as e:
+        logger.warning(f"Sentry non initialisé: {e}")
+
+    if ENV == "production":
+        if not API_KEYS:
+            logger.error("API_KEYS manquant en production")
+            raise RuntimeError("API_KEYS requis en production")
+        if ALLOWED_ORIGINS == "*" or not ALLOWED_ORIGINS.strip():
+            logger.error("ALLOWED_ORIGINS wildcard en production")
+            raise RuntimeError("ALLOWED_ORIGINS doit être une liste d'origines autorisées en production")
+    # Prometheus metrics
+    if HAS_PROM:
+        try:
+            Instrumentator().instrument(app).expose(app)
+            logger.info("Prometheus metrics exposées sur /metrics")
+        except Exception as e:
+            logger.warning(f"Instrumentator non disponible: {e}")
+
 # Health-check
 @app.get("/healthz")
 def healthz():
     return {"status": "ok"}
 
-# Rate limiting storage (in-memory)
+# Rate limiting: SlowAPI (Redis) si disponible, sinon fallback mémoire
 RL_BUCKETS: Dict[str, Tuple[float, int]] = {}
 
 def _rate_limit_key(request, api_key: str) -> str:
     if RATE_LIMIT_KEY.lower() == "apikey" and api_key:
         return f"ak:{api_key}"
-    # fallback to IP
     client_ip = getattr(request.client, "host", "unknown")
     return f"ip:{client_ip}"
+
+# SlowAPI setup
+if HAS_SLOWAPI and REDIS_URL:
+    def _key_func(request: Request):
+        auth = request.headers.get("Authorization", "")
+        if RATE_LIMIT_KEY.lower() == "apikey" and auth.startswith("Bearer "):
+            return auth.split(" ", 1)[1]
+        return get_remote_address(request)
+    limiter = Limiter(key_func=_key_func, storage_uri=REDIS_URL, default_limits=[RATE_LIMIT_RULE])
+    app.state.limiter = limiter
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+    app.add_middleware(SlowAPIMiddleware)
+else:
+    limiter = None  # fallback to in-memory limiter
 
 # Auth API key + rate limit (si configurée)
 @app.middleware("http")
 async def require_api_key(request, call_next):
+    # Inject request_id into log records
+    class RequestIdFilter(logging.Filter):
+        def filter(self, record):
+            try:
+                record.request_id = REQUEST_ID_CTX.get()
+            except Exception:
+                record.request_id = ""
+            return True
+    logging.getLogger().addFilter(RequestIdFilter())
+
     if request.url.path.startswith("/api/") or request.url.path.startswith("/v1/"):
         auth = request.headers.get("Authorization", "")
         api_key = auth.split(" ", 1)[1] if auth.startswith("Bearer ") else ""
-        # Auth (optionnel)
-        if API_KEYS and (not api_key or api_key not in API_KEYS):
-            return JSONResponse({"error": "Unauthorized"}, status_code=401)
-        # Rate limit
-        key = _rate_limit_key(request, api_key)
-        now = time.time()
-        bucket = RL_BUCKETS.get(key)
-        if not bucket or (now - bucket[0]) >= RATE_LIMIT_WINDOW_SEC:
-            RL_BUCKETS[key] = (now, 1)
-        else:
-            count = bucket[1] + 1
-            if count > RATE_LIMIT_MAX_REQ:
-                return JSONResponse({"error": "Too Many Requests"}, status_code=429)
-            RL_BUCKETS[key] = (bucket[0], count)
+
+        # Auth obligatoire en production (et optionnelle ailleurs si API_KEYS fourni)
+        if (ENV == "production") or API_KEYS:
+            if not api_key or api_key not in API_KEYS:
+                return JSONResponse({"error": "Unauthorized"}, status_code=401)
+
+            # RBAC léger: limiter les client_id par clé si configuré
+            if "client_id" in request.headers:
+                requested_client = request.headers.get("client_id", "")
+            else:
+                requested_client = ""
+
+            # essaye d'extraire client_id depuis body JSON si possible (non bloquant)
+            try:
+                if not requested_client and request.headers.get("content-type","").startswith("application/json"):
+                    body = await request.body()
+                    data = json.loads(body.decode("utf-8") or "{}")
+                    requested_client = str(data.get("client_id") or "")
+            except Exception:
+                pass
+
+            if API_KEYS_MAP:
+                allowed = API_KEYS_MAP.get(api_key, set())
+                if requested_client and requested_client not in allowed:
+                    return JSONResponse({"error": "Forbidden"}, status_code=403)
+
+        # Rate limit: utiliser SlowAPI si disponible (middleware déjà appliqué), sinon fallback mémoire
+        if not limiter:
+            key = _rate_limit_key(request, api_key)
+            now = time.time()
+            bucket = RL_BUCKETS.get(key)
+            if not bucket or (now - bucket[0]) >= RATE_LIMIT_WINDOW_SEC:
+                RL_BUCKETS[key] = (now, 1)
+            else:
+                count = bucket[1] + 1
+                if count > RATE_LIMIT_MAX_REQ:
+                    return JSONResponse({"error": "Too Many Requests"}, status_code=429)
+                RL_BUCKETS[key] = (bucket[0], count)
     return await call_next(request)
 
 class ChatRequest(BaseModel):
-    question: str
-    client_id: str = "bms_ventouse"
-    mode: str = "main"  # "main" | "alt"
+    question: str = Field(..., min_length=3, max_length=2000)
+    client_id: str = Field("bms_ventouse", min_length=1, max_length=64, regex=r"^[a-zA-Z0-9_-]{1,64}$")
+    mode: str = Field("main", regex=r"^(main|alt)$")
     refresh: bool = False  # reconstruire la pipeline
 
 def _handle_chat(req: ChatRequest) -> Dict[str, Any]:
@@ -324,10 +457,10 @@ def _handle_chat(req: ChatRequest) -> Dict[str, Any]:
         logger.error(f"Erreur /chat: {e}")
         return {"error": "Erreur serveur"}
 
-@app.post("/api/chat")
+@app.post("/api/chat", tags=["chat"], responses={401: {"description": "Unauthorized"}, 429: {"description": "Too Many Requests"}})
 def chat(req: ChatRequest):
     return _handle_chat(req)
 
-@app.post("/v1/chat")
+@app.post("/v1/chat", tags=["chat"], responses={401: {"description": "Unauthorized"}, 429: {"description": "Too Many Requests"}})
 def chat_v1(req: ChatRequest):
     return _handle_chat(req)
