@@ -20,7 +20,6 @@ from langchain_community.llms import Ollama as OllamaLLM
 from langchain_community.embeddings import OllamaEmbeddings, HuggingFaceEmbeddings
 from langchain.prompts import PromptTemplate
 
-
 # Optional OpenAI provider
 try:
     from langchain_openai import ChatOpenAI, OpenAIEmbeddings
@@ -55,82 +54,12 @@ from .config import (
     RATE_LIMIT_KEY,
 )
 
-# Settings (centralisées)
-from .config import (
-    LLM_PROVIDER,
-    LLM_MODEL,
-    EMBED_MODEL_OPENAI,
-    OLLAMA_LLM_MODEL,
-    OLLAMA_EMBED_MODEL,
-    HF_LLM_MODEL,
-    HF_EMBED_MODEL,
-    CHROMA_DIR_MAIN,
-    CHROMA_DIR_ALT,
-    ALLOWED_ORIGINS,
-    API_KEYS,
-    RETRIEVER_K,
-    RETRIEVER_SCORE_THRESHOLD,
-    RATE_LIMIT_WINDOW_SEC,
-    RATE_LIMIT_MAX_REQ,
-    RATE_LIMIT_KEY,
-)
-
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 # Ensure dirs exist
-os.makedirs(CHROMA_DIR_MAIN,ompt
-        self.enhancer = ContextEnhancer(client_data)
-        self.parser = AdvancedOutputParser(client_data.get("entreprise", {}).get("nom", "Votre entreprise"))
-
-    def process(self, question: str) -> str:
-        docs = self.retriever.get_relevant_documents(question)
-        context = self.enhancer.enhance(docs)
-        scen = detect_scenario(question)
-        prompt_text = self.prompt.format(
-            brand_name=self.client_data.get("entreprise", {}).get("nom", "Votre entreprise"),
-            context=context,
-            question=question,
-            scenario=scen,
-        )
-        raw = self.llm.invoke(prompt_text)
-        raw_text = getattr(raw, "content", raw)
-        return self.parser.parse(raw_text)
-
-
-def build_embeddings_and_llm() -> Tuple[Any, Any]:
-    if LLM_PROVIDER == "OPENAI":
-        if not HAS_OPENAI:
-            raise RuntimeError("langchain-openai non disponible. Ajoutez-le à requirements.txt")
-        emb = OpenAIEmbeddings(model=EMBED_MODEL_OPENAI)
-        llm = ChatOpenAI(model=LLM_MODEL, temperature=0.6)
-        return emb, llm
-
-    if LLM_PROVIDER == "OLLAMA":
-        emb = OllamaEmbeddings(model=OLLAMA_EMBED_MODEL)
-        llm = OllamaLLM(model=OLLAMA_LLM_MODEL, temperature=0.7, num_predict=300, top_k=20, top_p=0.9)
-        return emb, llm
-
-    # HF local (gratuit)
-    emb = HuggingFaceEmbeddings(model_name=HF_EMBED_MODEL)
-    # Pipeline text2text (FLAN-T5)
-    text2text = pipeline(
-        "text2text-generation",
-        model=HF_LLM_MODEL,
-        tokenizer=HF_LLM_MODEL,
-    )
-
-    class HFLLMWrapper:
-        def __init__(self, pipe):
-            self.pipe = pipe
-
-        def invoke(self, prompt: str) -> str:
-            out = self.pipe(prompt, max_new_tokens=200, do_sample=True, temperature=0.7, top_p=0.9)
-            return out[0]["generated_text"]
-
-    llm = HFLLMWrapper(text2text)
-    return emb, llm
-
+os.makedirs(CHROMA_DIR_MAIN, exist_ok=True)
+os.makedirs(CHROMA_DIR_ALT, exist_ok=True)
 
 # Sécurisation des chemins client pour éviter les traversals
 SAFE_ID = re.compile(r"^[a-zA-Z0-9_-]{1,64}$")
@@ -153,10 +82,65 @@ def load_client_data(mode: str, client_id: str) -> Dict[str, Any]:
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
 
+class Pipeline:
+    def __init__(self, mode: str, client_id: str, client_data: Dict[str, Any], retriever, llm, prompt: PromptTemplate):
+        self.mode = mode
+        self.client_id = client_id
+        self.client_data = client_data
+        self.retriever = retriever
+        self.llm = llm
+        self.prompt = prompt
+        self.enhancer = ContextEnhancer(client_data)
+        self.parser = AdvancedOutputParser(client_data.get("entreprise", {}).get("nom", "Votre entreprise"))
+
+    def process(self, question: str) -> str:
+        docs = self.retriever.get_relevant_documents(question)
+        context = self.enhancer.enhance(docs)
+        scen = detect_scenario(question)
+        prompt_text = self.prompt.format(
+            brand_name=self.client_data.get("entreprise", {}).get("nom", "Votre entreprise"),
+            context=context,
+            question=question,
+            scenario=scen,
+        )
+        raw = self.llm.invoke(prompt_text)
+        raw_text = getattr(raw, "content", raw)
+        return self.parser.parse(raw_text)
+
+def build_embeddings_and_llm() -> Tuple[Any, Any]:
+    if LLM_PROVIDER == "OPENAI":
+        if not HAS_OPENAI:
+            raise RuntimeError("langchain-openai non disponible. Ajoutez-le à requirements.txt")
+        emb = OpenAIEmbeddings(model=EMBED_MODEL_OPENAI)
+        llm = ChatOpenAI(model=LLM_MODEL, temperature=0.6)
+        return emb, llm
+
+    if LLM_PROVIDER == "OLLAMA":
+        emb = OllamaEmbeddings(model=OLLAMA_EMBED_MODEL)
+        llm = OllamaLLM(model=OLLAMA_LLM_MODEL, temperature=0.7, num_predict=300, top_k=20, top_p=0.9)
+        return emb, llm
+
+    # HF local (gratuit)
+    emb = HuggingFaceEmbeddings(model_name=HF_EMBED_MODEL)
+    text2text = pipeline(
+        "text2text-generation",
+        model=HF_LLM_MODEL,
+        tokenizer=HF_LLM_MODEL,
+    )
+
+    class HFLLMWrapper:
+        def __init__(self, pipe):
+            self.pipe = pipe
+
+        def invoke(self, prompt: str) -> str:
+            out = self.pipe(prompt, max_new_tokens=200, do_sample=True, temperature=0.7, top_p=0.9)
+            return out[0]["generated_text"]
+
+    llm = HFLLMWrapper(text2text)
+    return emb, llm
 
 def build_documents(mode: str, client_data_path: str):
     return load_and_prepare_documents(client_data_path)
-
 
 def build_pipeline(mode: str, client_id: str) -> Pipeline:
     safe_id = ensure_safe_client_id(client_id)
@@ -222,17 +206,14 @@ Réponse:"""
 
     return Pipeline(mode=mode, client_id=safe_id, client_data=client_data, retriever=retriever, llm=llm, prompt=prompt)
 
-
 # Cache mémoire des pipelines construits
 PIPELINES: Dict[Tuple[str, str], Pipeline] = {}
-
 
 def get_pipeline(mode: str, client_id: str) -> Pipeline:
     key = (mode, client_id)
     if key not in PIPELINES:
         PIPELINES[key] = build_pipeline(mode, client_id)
     return PIPELINES[key]
-
 
 # FastAPI app
 app = FastAPI(title="RAG API", version="1.0.0")
@@ -297,13 +278,11 @@ async def require_api_key(request, call_next):
             RL_BUCKETS[key] = (bucket[0], count)
     return await call_next(request)
 
-
 class ChatRequest(BaseModel):
     question: str
     client_id: str = "bms_ventouse"
     mode: str = "main"  # "main" | "alt"
     refresh: bool = False  # reconstruire la pipeline
-
 
 def _handle_chat(req: ChatRequest) -> Dict[str, Any]:
     if req.mode not in {"main", "alt"}:
