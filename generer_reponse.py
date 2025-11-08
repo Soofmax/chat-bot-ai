@@ -7,7 +7,8 @@ from langchain_community.embeddings import OllamaEmbeddings
 from langchain_community.llms import Ollama
 from langchain.prompts import PromptTemplate
 
-from shared.generation import AdvancedOutputParser, ContextEnhancer, detect_scenario
+from shared.generation import AdvancedOutputParser, ContextEnhancer, detect_scenario, ResponseQualityChecker
+from shared.config import OLLAMA_LLM_MODEL, OLLAMA_EMBED_MODEL, RETRIEVER_K, RETRIEVER_SCORE_THRESHOLD
 
 # --- Configuration ---
 CLIENT_ID = "bms_ventouse"
@@ -50,9 +51,9 @@ def initialize_rag_system(client_data: Dict[str, Any]):
 
     # 1. Initialisation des modèles
     logger.info("Initialisation des modèles Ollama...")
-    embeddings = OllamaEmbeddings(model="nomic-embed-text")
+    embeddings = OllamaEmbeddings(model=OLLAMA_EMBED_MODEL)
     llm = Ollama(
-        model="tinyllama",
+        model=OLLAMA_LLM_MODEL,
         temperature=0.7,
         num_predict=300,
         top_k=20,
@@ -70,10 +71,11 @@ def initialize_rag_system(client_data: Dict[str, Any]):
     retriever = vectorstore.as_retriever(
         search_type="similarity_score_threshold",
         search_kwargs={
-            "k": 3,
-            "score_threshold": 0.3,
+            "k": RETRIEVER_K,
+            "score_threshold": RETRIEVER_SCORE_THRESHOLD,
         },
     )
+ )
 
     # 4. Template simplifié
     template = """Tu es l'assistant de BMS Ventouse, expert en logistique audiovisuelle.

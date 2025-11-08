@@ -54,6 +54,24 @@ def detect_scenario(q: str) -> str:
     return "Question générale"
 
 
+class ResponseQualityChecker:
+    """Shared response quality checker used by CLIs"""
+
+    def __init__(self, brand_name: str | None = None):
+        self.brand_name = (brand_name or "").lower()
+
+    def check(self, response: str, min_length: int = 50) -> Dict[str, Any]:
+        rlower = response.lower()
+        checks = {
+            "has_brand_or_contact": (self.brand_name and self.brand_name in rlower) or ("contact" in rlower),
+            "sufficient_length": len(response) >= min_length,
+            "has_cta": any(k in rlower for k in ["contact", "appel", "whatsapp", "email", "devis", "disponible"]),
+            "no_prompt_leak": not any(k in response for k in ["MISSION", "VOCABULAIRE", "# ", "🎬"]),
+        }
+        checks["all_passed"] = all(checks.values())
+        return checks
+
+
 DEFAULT_PROMPT_TEMPLATE = """Tu es l'assistant de {brand_name}.
 
 CONTEXTE:

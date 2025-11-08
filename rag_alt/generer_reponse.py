@@ -7,7 +7,8 @@ from langchain_community.embeddings import OllamaEmbeddings
 from langchain_community.llms import Ollama
 from langchain.prompts import PromptTemplate
 
-from shared.generation import AdvancedOutputParser, ContextEnhancer, detect_scenario
+from shared.generation import AdvancedOutputParser, ContextEnhancer, detect_scenario, ResponseQualityChecker
+from shared.config import OLLAMA_LLM_MODEL, OLLAMA_EMBED_MODEL, RETRIEVER_K, RETRIEVER_SCORE_THRESHOLD
 
 # Configuration (RAG séparé)
 CLIENT_ID = "template_client"  # Changez pour votre nouveau client
@@ -45,8 +46,8 @@ def load_client_data() -> Dict[str, Any]:
 def initialize_rag(client_data: Dict[str, Any]):
     brand_name = client_data.get("entreprise", {}).get("nom", "Votre entreprise")
 
-    embeddings = OllamaEmbeddings(model="nomic-embed-text")
-    llm = Ollama(model="tinyllama", temperature=0.7, num_predict=300, top_k=20, top_p=0.9)
+    embeddings = OllamaEmbeddings(model=OLLAMA_EMBED_MODEL)
+    llm = Ollama(model=OLLAMA_LLM_MODEL, temperature=0.7, num_predict=top_k=20, top_p=0.9)
 
     vectorstore = Chroma(
         collection_name=CHROMA_COLLECTION_NAME,
@@ -56,7 +57,7 @@ def initialize_rag(client_data: Dict[str, Any]):
 
     retriever = vectorstore.as_retriever(
         search_type="similarity_score_threshold",
-        search_kwargs={"k": 3, "score_threshold": 0.3},
+        search_kwargs={"k": RETRIEVER_K, "score_threshold": RETRIEVER_SCORE_THRESHOLD},
     )
 
     template = """Tu es l'assistant de {brand_name}.
