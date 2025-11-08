@@ -57,7 +57,7 @@ except Exception:
     HAS_SLOWAPI = False
 
 # Local modules (shared)
-from shared.generation import AdvancedOutputParser, ContextEnhancer, detect_scenario
+from shared.generation import AdvancedOutputParser, ContextEnhancer, detect_scenario, DEFAULT_PROMPT_TEMPLATE
 from shared.indexing import load_and_prepare_documents
 
 # Settings (centralisées)
@@ -190,6 +190,17 @@ def build_embeddings_and_llm() -> Tuple[Any, Any]:
 def build_documents(mode: str, client_data_path: str):
     return load_and_prepare_documents(client_data_path)
 
+def _get_prompt_template(client_data: Dict[str, Any]) -> str:
+    """
+    Retourne un template de prompt par client si défini, sinon le template par défaut.
+    Doit contenir les variables: brand_name, context, question, scenario.
+    """
+    tmpl = client_data.get("prompt_template")
+    required = {"brand_name", "context", "question", "scenario"}
+    if isinstance(tmpl, str) and all(v in tmpl for v in required):
+        return tmpl
+    return DEFAULT_PROMPT_TEMPLATE
+
 def build_pipeline(mode: str, client_id: str) -> Pipeline:
     safe_id = ensure_safe_client_id(client_id)
     client_data = load_client_data(mode, safe_id)
@@ -238,18 +249,7 @@ def build_pipeline(mode: str, client_id: str) -> Pipeline:
         search_kwargs={"k": RETRIEVER_K, "score_threshold": RETRIEVER_SCORE_THRESHOLD},
     )
 
-    template = """Tu es l'assistant de {brand_name}.
-
-CONTEXTE:
-{context}
-
-CLIENT DIT: "{question}"
-
-SITUATION: {scenario}
-
-Mission: Réponds en 2-3 phrases claires, professionnelles et orientées solution. Termine par un appel à l'action (contact, devis, etc.).
-Réponse:"""
-
+    template = _get_prompt_template(client_data)
     prompt = PromptTemplate(template=template, input_variables=["brand_name", "context", "question", "scenario"])
 
     return Pipeline(mode=mode, client_id=safe_id, client_data=client_data, retriever=retriever, llm=llm, prompt=prompt)
