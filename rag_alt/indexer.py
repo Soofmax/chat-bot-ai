@@ -1,5 +1,5 @@
 import logging
-from typing import List
+from typing import List, Optional
 
 from langchain_community.vectorstores import Chroma
 from langchain_community.embeddings import OllamaEmbeddings
@@ -16,7 +16,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 
-def verify(vectorstore: Chroma, queries: List[str] = None):
+def verify(vectorstore: Chroma, queries: Optional[List[str]] = None):
     if queries is None:
         queries = ["services", "devis", "urgence", "références"]
     for q in queries:

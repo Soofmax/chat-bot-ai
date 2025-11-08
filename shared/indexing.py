@@ -29,7 +29,7 @@ class DataPreprocessor:
 
 
 def _safe_get(d: Dict[str, Any], path: List[str], default: Any = "") -> Any:
-    cur = d
+    cur: Any = d
     for p in path:
         if not isinstance(cur, dict):
             return default

@@ -1,5 +1,5 @@
 import logging
-from typing import List
+from typing import List, Optional
 
 from langchain_community.vectorstores import Chroma
 from langchain_community.embeddings import OllamaEmbeddings
@@ -17,7 +17,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 
-def verify_embedding_quality(vectorstore: Chroma, test_queries: List[str] = None):
+def verify_embedding_quality(vectorstore: Chroma, test_queries: Optional[List[str]] = None):
     """Vérifie la qualité des embeddings avec des requêtes tests"""
     if test_queries is None:
         test_queries = [

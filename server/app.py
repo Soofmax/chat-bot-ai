@@ -111,17 +111,17 @@ def build_embeddings_and_llm() -> Tuple[Any, Any]:
     if LLM_PROVIDER == "OPENAI":
         if not HAS_OPENAI:
             raise RuntimeError("langchain-openai non disponible. Ajoutez-le à requirements.txt")
-        emb = OpenAIEmbeddings(model=EMBED_MODEL_OPENAI)
-        llm = ChatOpenAI(model=LLM_MODEL, temperature=0.6)
+        emb: Any = OpenAIEmbeddings(model=EMBED_MODEL_OPENAI)
+        llm: Any = ChatOpenAI(model=LLM_MODEL, temperature=0.6)
         return emb, llm
 
     if LLM_PROVIDER == "OLLAMA":
-        emb = OllamaEmbeddings(model=OLLAMA_EMBED_MODEL)
-        llm = OllamaLLM(model=OLLAMA_LLM_MODEL, temperature=0.7, num_predict=300, top_k=20, top_p=0.9)
+        emb: Any = OllamaEmbeddings(model=OLLAMA_EMBED_MODEL)
+        llm: Any = OllamaLLM(model=OLLAMA_LLM_MODEL, temperature=0.7, num_predict=300, top_k=20, top_p=0.9)
         return emb, llm
 
     # HF local (gratuit)
-    emb = HuggingFaceEmbeddings(model_name=HF_EMBED_MODEL)
+    emb: Any = HuggingFaceEmbeddings(model_name=HF_EMBED_MODEL)
     text2text = pipeline(
         "text2text-generation",
         model=HF_LLM_MODEL,
@@ -136,7 +136,7 @@ def build_embeddings_and_llm() -> Tuple[Any, Any]:
             out = self.pipe(prompt, max_new_tokens=200, do_sample=True, temperature=0.7, top_p=0.9)
             return out[0]["generated_text"]
 
-    llm = HFLLMWrapper(text2text)
+    llm: Any = HFLLMWrapper(text2text)
     return emb, llm
 
 def build_documents(mode: str, client_data_path: str):
