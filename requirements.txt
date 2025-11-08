@@ -14,7 +14,7 @@ torch==2.8.0
 starlette==0.40.0
 urllib3==2.5.0
 typer==0.9.0
-slowapi==0.5.4
+slowapi==0.1.9
 redis==5.0.7
 python-json-logger==2.0.7
 prometheus-fastapi-instrumentator==6.1.0
