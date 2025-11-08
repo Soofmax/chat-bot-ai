@@ -2,7 +2,7 @@
 line-length = 100
 target-version = ["py311"]
 skip-string-normalization = true
-extend-exclude = """
+extend-exclude = '''
 (
   ^rag_alt/
 | ^server/
@@ -11,4 +11,4 @@ extend-exclude = """
 | ^indexer\.py
 | ^generer_reponse\.py
 )
-"""
+'''
