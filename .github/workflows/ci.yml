@@ -52,3 +52,73 @@ jobs:
       - name: Security audit (safety)
         continue-on-error: true
         run: safety check -r requirements.txt --full-report
+
+  docker-build-scan:
+    runs-on: ubuntu-latest
+    needs: build-test-audit
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare lowercase owner
+        run: echo "REPO_OWNER_LC=${GITHUB_REPOSITORY_OWNER,,}" >> $GITHUB_ENV
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image (load to local daemon)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          platforms: linux/amd64
+          tags: ghcr.io/${{ env.REPO_OWNER_LC }}/chat-bot-ai:latest
+
+      - name: Scan image with Trivy (filesystem)
+        uses: aquasecurity/trivy-action@0.20.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          format: table
+          exit-code: 0
+          severity: CRITICAL,HIGH
+
+      - name: Scan image with Trivy (image)
+        uses: aquasecurity/trivy-action@0.20.0
+        with:
+          scan-type: image
+          image-ref: ghcr.io/${{ env.REPO_OWNER_LC }}/chat-bot-ai:latest
+          format: table
+          exit-code: 0
+          severity: CRITICAL,HIGH
+
+  codeql-analyze:
+    name: CodeQL Analyze
+    runs-on: ubuntu-latest
+    needs: build-test-audit
+    permissions:
+      security-events: write
+      actions: read
+      contents: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: ["python"]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:python"
