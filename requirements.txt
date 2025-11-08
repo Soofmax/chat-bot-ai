@@ -1,5 +1,5 @@
-langchain==0.1.17
-langchain-community==0.0.36
+langchain==0.2.5
+langchain-community==0.3.27
 chromadb==0.5.3
 ollama==0.1.8
 fastapi==0.109.1
@@ -9,4 +9,6 @@ pydantic==2.5.3
 transformers==4.53.0
 sentence-transformers==3.1.0
 accelerate==0.25.0
-torch==2.6.0
+torch==2.8.0
+starlette==0.47.2
+urllib3==2.5.0

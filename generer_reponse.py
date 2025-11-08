@@ -5,7 +5,7 @@ from typing import Dict, Any
 from langchain_community.vectorstores import Chroma
 from langchain_community.embeddings import OllamaEmbeddings
 from langchain_community.llms import Ollama
-from langchain.prompts import PromptTemplate
+from langchain_core.prompts import PromptTemplate
 
 from shared.generation import AdvancedOutputParser, ContextEnhancer, detect_scenario, ResponseQualityChecker
 from shared.config import OLLAMA_LLM_MODEL, OLLAMA_EMBED_MODEL, RETRIEVER_K, RETRIEVER_SCORE_THRESHOLD

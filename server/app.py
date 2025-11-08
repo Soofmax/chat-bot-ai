@@ -18,7 +18,7 @@ import chromadb
 from langchain_community.vectorstores import Chroma
 from langchain_community.llms import Ollama as OllamaLLM
 from langchain_community.embeddings import OllamaEmbeddings, HuggingFaceEmbeddings
-from langchain.prompts import PromptTemplate
+from langchain_core.prompts import PromptTemplate
 
 # Optional OpenAI provider
 try:
