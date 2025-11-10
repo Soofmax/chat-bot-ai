@@ -321,9 +321,16 @@ def _handle_chat(req: ChatRequest) -> Dict[str, Any] | JSONResponse:
 class ErrorResponse(BaseModel):
     error: str
 
+class ChatResponse(BaseModel):
+    client_id: str
+    mode: Literal["main", "alt"]
+    provider: str
+    response: str
+
 @router.post(
     "/api/chat",
     tags=["chat"],
+    response_model=ChatResponse,
     responses={
         400: {"model": ErrorResponse, "description": "Bad Request"},
         401: {"model": ErrorResponse, "description": "Unauthorized"},
@@ -339,6 +346,7 @@ def chat(req: ChatRequest):
 @router.post(
     "/v1/chat",
     tags=["chat"],
+    response_model=ChatResponse,
     responses={
         400: {"model": ErrorResponse, "description": "Bad Request"},
         401: {"model": ErrorResponse, "description": "Unauthorized"},

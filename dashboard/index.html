@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Dashboard Client — RAG API</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="container">
+    <h1>Dashboard Client</h1>
+    <p class="desc">Tester l'API RAG pour un client. Configurez l'URL API, la clé et les paramètres.</p>
+
+    <section class="card">
+      <h2>Configuration</h2>
+      <div class="grid">
+        <label>
+          API Base URL
+          <input id="apiUrl" type="text" placeholder="https://api.example.com">
+        </label>
+        <label>
+          API Key (Bearer)
+          <input id="apiKey" type="text" placeholder="clé API (optionnelle en dev)">
+        </label>
+        <label>
+          Client ID
+          <input id="clientId" type="text" placeholder="bms_ventouse">
+        </label>
+        <label>
+          Mode
+          <select id="mode">
+            <option value="main">main</option>
+            <option value="alt">alt</option>
+          </select>
+        </label>
+      </div>
+      <button id="saveCfg">Enregistrer la configuration</button>
+      <small class="hint">La configuration est sauvegardée dans le navigateur (localStorage).</small>
+    </section>
+
+    <section class="card">
+      <h2>Question</h2>
+      <textarea id="question" rows="4" placeholder="Posez une question..."></textarea>
+      <div class="actions">
+        <label><input type="checkbox" id="refresh"> Forcer reindex (refresh)</label>
+        <button id="sendBtn">Envoyer</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Résultat</h2>
+      <pre id="result"></pre>
+      <div id="meta" class="meta"></div>
+    </section>
+
+    <footer>
+      <small>Assurez-vous que votre domaine est dans ALLOWED_ORIGINS côté serveur pour CORS.</small>
+    </footer>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

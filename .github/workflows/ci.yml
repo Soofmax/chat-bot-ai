@@ -46,6 +46,24 @@ jobs:
       - name: Tests (coverage >= 70%)
         run: pytest -q --disable-warnings --maxfail=1 --cov=server --cov-report=term-missing --cov-fail-under=70
 
+      - name: Setup Node (for openapi-typescript)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Generate OpenAPI schema and TS types
+        run: |
+          python scripts/export_openapi.py
+          npx --yes openapi-typescript openapi.json -o shared/api-types.ts
+
+      - name: Upload OpenAPI and TS types
+        uses: actions/upload-artifact@v4
+        with:
+          name: openapi-and-types
+          path: |
+            openapi.json
+            shared/api-types.ts
+
       - name: Security audit (pip-audit)
         run: |
           pip-audit -r requirements.txt \
