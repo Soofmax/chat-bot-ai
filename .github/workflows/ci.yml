@@ -2,8 +2,11 @@ name: CI
 
 on:
   push:
-    branches: ["**"]
+    branches:
+      - main
   pull_request:
+    branches:
+      - "**"
   workflow_dispatch:
   schedule:
     - cron: "0 2 * * 1"  # Weekly audit run (Mondays 02:00 UTC)
