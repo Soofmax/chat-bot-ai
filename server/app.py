@@ -6,7 +6,7 @@ import time
 import uuid
 import contextvars
 
-from typing import Dict, Any, Tuple
+from typing import Dict, Any, Tuple, Optional, Literal
 from pathlib import Path
 
 from fastapi import FastAPI, Request
@@ -343,18 +343,29 @@ def _rate_limit_key(request, api_key: str) -> str:
     return f"ip:{client_ip}"
 
 # SlowAPI setup
+limiter: Optional[Any] = None
 if HAS_SLOWAPI and REDIS_URL:
     def _key_func(request: Request):
         auth = request.headers.get("Authorization", "")
         if RATE_LIMIT_KEY.lower() == "apikey" and auth.startswith("Bearer "):
             return auth.split(" ", 1)[1]
         return get_remote_address(request)
+
     limiter = Limiter(key_func=_key_func, storage_uri=REDIS_URL, default_limits=[RATE_LIMIT_RULE])
     app.state.limiter = limiter
-    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+    # Wrapper pour satisfaire le type attendu par add_exception_handler
+    async def _rl_exceeded_handler(request: Request, exc: Exception):
+        try:
+            # réutiliser le handler slowapi si l'exception correspond
+            if isinstance(exc, RateLimitExceeded):  # type: ignore[arg-type]
+                return _rate_limit_exceeded_handler(request, exc)  # type: ignore[arg-type]
+        except Exception:
+            pass
+        return JSONResponse({"error": "Too Many Requests"}, status_code=429)
+
+    app.add_exception_handler(RateLimitExceeded, _rl_exceeded_handler)
     app.add_middleware(SlowAPIMiddleware)
-else:
-    limiter = None  # fallback to in-memory limiter
 
 # Auth API key + rate limit (si configurée)
 @app.middleware("http")
@@ -414,8 +425,8 @@ async def require_api_key(request, call_next):
 
 class ChatRequest(BaseModel):
     question: str = Field(..., min_length=3, max_length=2000)
-    client_id: str = Field("bms_ventouse", min_length=1, max_length=64, regex=r"^[a-zA-Z0-9_-]{1,64}$")
-    mode: str = Field("main", regex=r"^(main|alt)$")
+    client_id: str = "bms_ventouse"  # validation regex gérée par ensure_safe_client_id()
+    mode: Literal["main", "alt"] = "main"
     refresh: bool = False  # reconstruire la pipeline
 
 def _handle_chat(req: ChatRequest) -> Dict[str, Any]:
