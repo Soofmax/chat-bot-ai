@@ -9,7 +9,7 @@ import contextvars
 from typing import Dict, Any, Tuple, Optional, Literal
 from pathlib import Path
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
@@ -263,165 +263,13 @@ def get_pipeline(mode: str, client_id: str) -> Pipeline:
         PIPELINES[key] = build_pipeline(mode, client_id)
     return PIPELINES[key]
 
-# FastAPI app
-app = FastAPI(title="RAG API", version="1.0.0")
-
-# Correlation ID middleware
-class CorrelationIdMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next):
-        rid = request.headers.get("X-Request-ID") or str(uuid.uuid4())
-        REQUEST_ID_CTX.set(rid)
-        response = await call_next(request)
-        response.headers["X-Request-ID"] = rid
-        return response
-
-app.add_middleware(CorrelationIdMiddleware)
-
-# CORS (piloté par env)
-_allowed = [o.strip() for o in ALLOWED_ORIGINS.split(",")] if ALLOWED_ORIGINS else []
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=_allowed if _allowed else ["*"],
-    allow_credentials=False,
-    allow_methods=["POST", "OPTIONS"],
-    allow_headers=["Content-Type", "Authorization"],
-)
-
-# Headers de sécurité
-class SecurityHeadersMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request, call_next):
-        response = await call_next(request)
-        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
-        response.headers["X-Content-Type-Options"] = "nosniff"
-        response.headers["X-Frame-Options"] = "DENY"
-        response.headers["Referrer-Policy"] = "no-referrer"
-        response.headers["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'none';"
-        return response
-
-app.add_middleware(SecurityHeadersMiddleware)
-
-# Startup gating: exigences production
-@app.on_event("startup")
-async def _startup_checks():
-    # Sentry (optionnel)
-    try:
-        dsn = os.getenv("SENTRY_DSN", "")
-        if dsn:
-            import sentry_sdk  # type: ignore
-            sentry_sdk.init(dsn=dsn, traces_sample_rate=float(os.getenv("SENTRY_TRACES_SAMPLE_RATE", "0.0")))
-            logger.info("Sentry initialisé")
-    except Exception as e:
-        logger.warning(f"Sentry non initialisé: {e}")
-
-    if ENV == "production":
-        if not API_KEYS:
-            logger.error("API_KEYS manquant en production")
-            raise RuntimeError("API_KEYS requis en production")
-        if ALLOWED_ORIGINS == "*" or not ALLOWED_ORIGINS.strip():
-            logger.error("ALLOWED_ORIGINS wildcard en production")
-            raise RuntimeError("ALLOWED_ORIGINS doit être une liste d'origines autorisées en production")
-    # Prometheus metrics
-    if HAS_PROM:
-        try:
-            Instrumentator().instrument(app).expose(app)
-            logger.info("Prometheus metrics exposées sur /metrics")
-        except Exception as e:
-            logger.warning(f"Instrumentator non disponible: {e}")
+# Router pour définir les endpoints indépendamment de l'instance FastAPI
+router = APIRouter()
 
 # Health-check
-@app.get("/healthz")
+@router.get("/healthz")
 def healthz():
     return {"status": "ok"}
-
-# Rate limiting: SlowAPI (Redis) si disponible, sinon fallback mémoire
-RL_BUCKETS: Dict[str, Tuple[float, int]] = {}
-
-def _rate_limit_key(request, api_key: str) -> str:
-    if RATE_LIMIT_KEY.lower() == "apikey" and api_key:
-        return f"ak:{api_key}"
-    client_ip = getattr(request.client, "host", "unknown")
-    return f"ip:{client_ip}"
-
-# SlowAPI setup
-limiter: Optional[Any] = None
-if HAS_SLOWAPI and REDIS_URL:
-    def _key_func(request: Request):
-        auth = request.headers.get("Authorization", "")
-        if RATE_LIMIT_KEY.lower() == "apikey" and auth.startswith("Bearer "):
-            return auth.split(" ", 1)[1]
-        return get_remote_address(request)
-
-    limiter = Limiter(key_func=_key_func, storage_uri=REDIS_URL, default_limits=[RATE_LIMIT_RULE])
-    app.state.limiter = limiter
-
-    # Wrapper pour satisfaire le type attendu par add_exception_handler
-    async def _rl_exceeded_handler(request: Request, exc: Exception):
-        try:
-            # réutiliser le handler slowapi si l'exception correspond
-            if isinstance(exc, RateLimitExceeded):  # type: ignore[arg-type]
-                return _rate_limit_exceeded_handler(request, exc)  # type: ignore[arg-type]
-        except Exception:
-            pass
-        return JSONResponse({"error": "Too Many Requests"}, status_code=429)
-
-    app.add_exception_handler(RateLimitExceeded, _rl_exceeded_handler)
-    app.add_middleware(SlowAPIMiddleware)
-
-# Auth API key + rate limit (si configurée)
-@app.middleware("http")
-async def require_api_key(request, call_next):
-    # Inject request_id into log records
-    class RequestIdFilter(logging.Filter):
-        def filter(self, record):
-            try:
-                record.request_id = REQUEST_ID_CTX.get()
-            except Exception:
-                record.request_id = ""
-            return True
-    logging.getLogger().addFilter(RequestIdFilter())
-
-    if request.url.path.startswith("/api/") or request.url.path.startswith("/v1/"):
-        auth = request.headers.get("Authorization", "")
-        api_key = auth.split(" ", 1)[1] if auth.startswith("Bearer ") else ""
-
-        # Auth obligatoire en production (et optionnelle ailleurs si API_KEYS fourni)
-        if (ENV == "production") or API_KEYS:
-            if not api_key or api_key not in API_KEYS:
-                return JSONResponse({"error": "Unauthorized"}, status_code=401)
-
-            # RBAC léger: limiter les client_id par clé si configuré
-            if "client_id" in request.headers:
-                requested_client = request.headers.get("client_id", "")
-            else:
-                requested_client = ""
-
-            # essaye d'extraire client_id depuis body JSON si possible (non bloquant)
-            try:
-                if not requested_client and request.headers.get("content-type","").startswith("application/json"):
-                    body = await request.body()
-                    data = json.loads(body.decode("utf-8") or "{}")
-                    requested_client = str(data.get("client_id") or "")
-            except Exception:
-                pass
-
-            if API_KEYS_MAP:
-                allowed = API_KEYS_MAP.get(api_key, set())
-                if requested_client and requested_client not in allowed:
-                    return JSONResponse({"error": "Forbidden"}, status_code=403)
-
-        # Rate limit: utiliser SlowAPI si disponible (middleware déjà appliqué), sinon fallback mémoire
-        if not limiter:
-            key = _rate_limit_key(request, api_key)
-            now = time.time()
-            bucket = RL_BUCKETS.get(key)
-            if not bucket or (now - bucket[0]) >= RATE_LIMIT_WINDOW_SEC:
-                RL_BUCKETS[key] = (now, 1)
-            else:
-                count = bucket[1] + 1
-                if count > RATE_LIMIT_MAX_REQ:
-                    return JSONResponse({"error": "Too Many Requests"}, status_code=429)
-                RL_BUCKETS[key] = (bucket[0], count)
-    return await call_next(request)
 
 class ChatRequest(BaseModel):
     question: str = Field(..., min_length=3, max_length=2000)
@@ -468,10 +316,158 @@ def _handle_chat(req: ChatRequest) -> Dict[str, Any]:
         logger.error(f"Erreur /chat: {e}")
         return {"error": "Erreur serveur"}
 
-@app.post("/api/chat", tags=["chat"], responses={401: {"description": "Unauthorized"}, 429: {"description": "Too Many Requests"}})
+@router.post("/api/chat", tags=["chat"], responses={401: {"description": "Unauthorized"}, 429: {"description": "Too Many Requests"}})
 def chat(req: ChatRequest):
     return _handle_chat(req)
 
-@app.post("/v1/chat", tags=["chat"], responses={401: {"description": "Unauthorized"}, 429: {"description": "Too Many Requests"}})
+@router.post("/v1/chat", tags=["chat"], responses={401: {"description": "Unauthorized"}, 429: {"description": "Too Many Requests"}})
 def chat_v1(req: ChatRequest):
     return _handle_chat(req)
+
+# Middleware classes
+class CorrelationIdMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        rid = request.headers.get("X-Request-ID") or str(uuid.uuid4())
+        REQUEST_ID_CTX.set(rid)
+        response = await call_next(request)
+        response.headers["X-Request-ID"] = rid
+        return response
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        response = await call_next(request)
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Referrer-Policy"] = "no-referrer"
+        response.headers["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'none';"
+        return response
+
+def build_app() -> FastAPI:
+    app = FastAPI(title="RAG API", version="1.0.0")
+
+    # Middlewares
+    app.add_middleware(CorrelationIdMiddleware)
+
+    _allowed = [o.strip() for o in ALLOWED_ORIGINS.split(",")] if ALLOWED_ORIGINS else []
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=_allowed if _allowed else ["*"],
+        allow_credentials=False,
+        allow_methods=["POST", "OPTIONS"],
+        allow_headers=["Content-Type", "Authorization"],
+    )
+
+    app.add_middleware(SecurityHeadersMiddleware)
+
+    # Startup gating: exigences production
+    @app.on_event("startup")
+    async def _startup_checks():
+        # Sentry (optionnel)
+        try:
+            dsn = os.getenv("SENTRY_DSN", "")
+            if dsn:
+                import sentry_sdk  # type: ignore
+                sentry_sdk.init(dsn=dsn, traces_sample_rate=float(os.getenv("SENTRY_TRACES_SAMPLE_RATE", "0.0")))
+                logger.info("Sentry initialisé")
+        except Exception as e:
+            logger.warning(f"Sentry non initialisé: {e}")
+
+        if ENV == "production":
+            if not API_KEYS:
+                logger.error("API_KEYS manquant en production")
+                raise RuntimeError("API_KEYS requis en production")
+            if ALLOWED_ORIGINS == "*" or not ALLOWED_ORIGINS.strip():
+                logger.error("ALLOWED_ORIGINS wildcard en production")
+                raise RuntimeError("ALLOWED_ORIGINS doit être une liste d'origines autorisées en production")
+        # Prometheus metrics
+        if HAS_PROM:
+            try:
+                Instrumentator().instrument(app).expose(app)
+                logger.info("Prometheus metrics exposées sur /metrics")
+            except Exception as e:
+                logger.warning(f"Instrumentator non disponible: {e}")
+
+    # Rate limiting: SlowAPI (Redis) si disponible, sinon fallback mémoire
+    RL_BUCKETS.clear()
+
+    def _rate_limit_key(request, api_key: str) -> str:
+        if RATE_LIMIT_KEY.lower() == "apikey" and api_key:
+            return f"ak:{api_key}"
+        client_ip = getattr(request.client, "host", "unknown")
+        return f"ip:{client_ip}"
+
+    limiter_local: Optional[Any] = None
+    if HAS_SLOWAPI and REDIS_URL:
+        def _key_func(request: Request):
+            auth = request.headers.get("Authorization", "")
+            if RATE_LIMIT_KEY.lower() == "apikey" and auth.startswith("Bearer "):
+                return auth.split(" ", 1)[1]
+            return get_remote_address(request)
+
+        limiter_local = Limiter(key_func=_key_func, storage_uri=REDIS_URL, default_limits=[RATE_LIMIT_RULE])
+        app.state.limiter = limiter_local
+
+        async def _rl_exceeded_handler(request: Request, exc: Exception):
+            try:
+                if isinstance(exc, RateLimitExceeded):  # type: ignore[arg-type]
+                    return _rate_limit_exceeded_handler(request, exc)  # type: ignore[arg-type]
+            except Exception:
+                pass
+            return JSONResponse({"error": "Too Many Requests"}, status_code=429)
+
+        app.add_exception_handler(RateLimitExceeded, _rl_exceeded_handler)
+        app.add_middleware(SlowAPIMiddleware)
+
+    @app.middleware("http")
+    async def require_api_key(request, call_next):
+        class RequestIdFilter(logging.Filter):
+            def filter(self, record):
+                try:
+                    record.request_id = REQUEST_ID_CTX.get()
+                except Exception:
+                    record.request_id = ""
+                return True
+        logging.getLogger().addFilter(RequestIdFilter())
+
+        if request.url.path.startswith("/api/") or request.url.path.startswith("/v1/"):
+            auth = request.headers.get("Authorization", "")
+            api_key = auth.split(" ", 1)[1] if auth.startswith("Bearer ") else ""
+
+            if (ENV == "production") or API_KEYS:
+                if not api_key or api_key not in API_KEYS:
+                    return JSONResponse({"error": "Unauthorized"}, status_code=401)
+
+                requested_client = request.headers.get("client_id", "")
+                try:
+                    if not requested_client and request.headers.get("content-type","").startswith("application/json"):
+                        body = await request.body()
+                        data = json.loads(body.decode("utf-8") or "{}")
+                        requested_client = str(data.get("client_id") or "")
+                except Exception:
+                    pass
+
+                if API_KEYS_MAP:
+                    allowed = API_KEYS_MAP.get(api_key, set())
+                    if requested_client and requested_client not in allowed:
+                        return JSONResponse({"error": "Forbidden"}, status_code=403)
+
+            if not limiter_local:
+                key = _rate_limit_key(request, api_key)
+                now = time.time()
+                bucket = RL_BUCKETS.get(key)
+                if not bucket or (now - bucket[0]) >= RATE_LIMIT_WINDOW_SEC:
+                    RL_BUCKETS[key] = (now, 1)
+                else:
+                    count = bucket[1] + 1
+                    if count > RATE_LIMIT_MAX_REQ:
+                        return JSONResponse({"error": "Too Many Requests"}, status_code=429)
+                    RL_BUCKETS[key] = (bucket[0], count)
+        return await call_next(request)
+
+    # Inclure le router
+    app.include_router(router)
+    return app
+
+# Instance par défaut
+app = build_app()

@@ -1,11 +1,4 @@
 [run]
+source = server
 omit =
-    create_client.py
-    create_client_wizard.py
-    generer_reponse.py
-    indexer.py
-    rag_alt/*
-    shared/indexing.py
-    clients/*
     server/__init__.py
-    shared/__init__.py
