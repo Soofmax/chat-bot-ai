@@ -12,8 +12,8 @@ def test_auth_required_in_production(monkeypatch):
     monkeypatch.setattr(app_module, "ENV", "production")
     monkeypatch.setattr(app_module, "API_KEYS", {"k1"})
     monkeypatch.setattr(app_module, "ALLOWED_ORIGINS", "http://example.com")
-    # Use in-memory limiter fallback
-    monkeypatch.setattr(app_module, "REDIS_URL", "")
+    # Provide a dummy REDIS_URL to satisfy production gating (SlowAPI not used if HAS_SLOWAPI is False)
+    monkeypatch.setattr(app_module, "REDIS_URL", "redis://dummy:6379")
     # Stub pipeline to avoid heavy model loading
     monkeypatch.setattr(app_module, "get_pipeline", lambda mode, client_id: StubPipeline())
 

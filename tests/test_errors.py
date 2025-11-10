@@ -13,6 +13,6 @@ def test_file_not_found_error(monkeypatch):
 
     with TestClient(app_module.app) as client:
         r = client.post("/api/chat", json={"question": "Test", "client_id": "missing", "mode": "main"})
-        assert r.status_code == 200
+        assert r.status_code == 404
         body = r.json()
         assert "error" in body and "introuvable" in body.get("error","")

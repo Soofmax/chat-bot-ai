@@ -12,3 +12,4 @@ def test_security_headers_present(monkeypatch):
     assert hdrs.get("X-Frame-Options") == "DENY"
     assert hdrs.get("Referrer-Policy") == "no-referrer"
     assert "Content-Security-Policy" in hdrs
+    assert "Permissions-Policy" in hdrs

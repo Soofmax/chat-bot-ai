@@ -13,7 +13,8 @@ def test_rbac_client_scope(monkeypatch):
     monkeypatch.setattr(app_module, "API_KEYS", {"k1"})
     monkeypatch.setattr(app_module, "ALLOWED_ORIGINS", "http://example.com")
     monkeypatch.setattr(app_module, "API_KEYS_MAP", {"k1": {"allowed_client"}})
-    monkeypatch.setattr(app_module, "REDIS_URL", "")
+    # Provide dummy REDIS_URL to satisfy production gating
+    monkeypatch.setattr(app_module, "REDIS_URL", "redis://dummy:6379")
     monkeypatch.setattr(app_module, "get_pipeline", lambda mode, client_id: StubPipeline())
 
     client = TestClient(app_module.app)

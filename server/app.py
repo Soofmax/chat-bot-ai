@@ -279,14 +279,14 @@ class ChatRequest(BaseModel):
     mode: Literal["main", "alt"] = "main"
     refresh: bool = False  # reconstruire la pipeline
 
-def _handle_chat(req: ChatRequest) -> Dict[str, Any]:
+def _handle_chat(req: ChatRequest) -> Dict[str, Any] | JSONResponse:
     if req.mode not in {"main", "alt"}:
-        return {"error": "mode invalide. Utilisez 'main' ou 'alt'."}
+        return JSONResponse({"error": "mode invalide. Utilisez 'main' ou 'alt'."}, status_code=400)
 
     try:
         safe_id = ensure_safe_client_id(req.client_id)
     except ValueError:
-        return {"error": "client_id invalide"}
+        return JSONResponse({"error": "client_id invalide"}, status_code=400)
 
     # Refresh optionnel : purge cache + collection persistée
     if req.refresh:
@@ -313,16 +313,41 @@ def _handle_chat(req: ChatRequest) -> Dict[str, Any]:
             "response": response,
         }
     except FileNotFoundError:
-        return {"error": f"Fichier client introuvable pour {safe_id} en mode {req.mode}."}
+        return JSONResponse({"error": f"Fichier client introuvable pour {safe_id} en mode {req.mode}."}, status_code=404)
     except Exception as e:
         logger.error(f"Erreur /chat: {e}")
-        return {"error": "Erreur serveur"}
+        return JSONResponse({"error": "Erreur serveur"}, status_code=500)
 
-@router.post("/api/chat", tags=["chat"], responses={401: {"description": "Unauthorized"}, 429: {"description": "Too Many Requests"}})
+class ErrorResponse(BaseModel):
+    error: str
+
+@router.post(
+    "/api/chat",
+    tags=["chat"],
+    responses={
+        400: {"model": ErrorResponse, "description": "Bad Request"},
+        401: {"model": ErrorResponse, "description": "Unauthorized"},
+        403: {"model": ErrorResponse, "description": "Forbidden"},
+        404: {"model": ErrorResponse, "description": "Not Found"},
+        429: {"model": ErrorResponse, "description": "Too Many Requests"},
+        500: {"model": ErrorResponse, "description": "Server Error"},
+    },
+)
 def chat(req: ChatRequest):
     return _handle_chat(req)
 
-@router.post("/v1/chat", tags=["chat"], responses={401: {"description": "Unauthorized"}, 429: {"description": "Too Many Requests"}})
+@router.post(
+    "/v1/chat",
+    tags=["chat"],
+    responses={
+        400: {"model": ErrorResponse, "description": "Bad Request"},
+        401: {"model": ErrorResponse, "description": "Unauthorized"},
+        403: {"model": ErrorResponse, "description": "Forbidden"},
+        404: {"model": ErrorResponse, "description": "Not Found"},
+        429: {"model": ErrorResponse, "description": "Too Many Requests"},
+        500: {"model": ErrorResponse, "description": "Server Error"},
+    },
+)
 def chat_v1(req: ChatRequest):
     return _handle_chat(req)
 
@@ -343,6 +368,8 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Referrer-Policy"] = "no-referrer"
         response.headers["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'none';"
+        # Permissions-Policy: disable sensitive browser features by default
+        response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
         return response
 
 def build_app() -> FastAPI:
@@ -393,6 +420,9 @@ def build_app() -> FastAPI:
             if ALLOWED_ORIGINS == "*" or not ALLOWED_ORIGINS.strip():
                 logger.error("ALLOWED_ORIGINS wildcard en production")
                 raise RuntimeError("ALLOWED_ORIGINS doit être une liste d'origines autorisées en production")
+            if not REDIS_URL.strip():
+                logger.error("REDIS_URL manquant en production (rate limiting requis)")
+                raise RuntimeError("REDIS_URL requis en production pour le rate limiting")
         # Prometheus metrics: déplacé avant le startup pour éviter l'ajout de middleware après démarrage
         pass
 
