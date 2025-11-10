@@ -238,7 +238,7 @@ def build_pipeline(mode: str, client_id: str) -> Pipeline:
         docs = docs_loader(str(data_path))
         vectorstore = Chroma.from_documents(
             documents=docs,
-            embedding=emb,
+            embedding_function=emb,
             collection_name=collection,
             persist_directory=persist_dir,
             collection_metadata={"hnsw:space": "cosine"},

@@ -23,8 +23,9 @@ def test_build_embeddings_hf(monkeypatch):
     monkeypatch.setattr(app_module, "LLM_PROVIDER", "HF")
     monkeypatch.setattr(app_module, "HF_EMBED_MODEL", "dummy-embed")
     monkeypatch.setattr(app_module, "HF_LLM_MODEL", "dummy-llm")
-    # Patch transformers.pipeline to avoid downloads
+    # Patch transformers.pipeline and embeddings to avoid downloads
     monkeypatch.setattr(app_module, "pipeline", lambda *a, **k: FakePipe())
+    monkeypatch.setattr(app_module, "HuggingFaceEmbeddings", FakeEmb)
 
     emb, llm = app_module.build_embeddings_and_llm()
     assert emb is not None and llm is not None
