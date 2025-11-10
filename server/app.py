@@ -256,6 +256,8 @@ def build_pipeline(mode: str, client_id: str) -> Pipeline:
 
 # Cache mémoire des pipelines construits
 PIPELINES: Dict[Tuple[str, str], Pipeline] = {}
+# Rate limiting storage (in-memory) at module level
+RL_BUCKETS: Dict[str, Tuple[float, int]] = {}
 
 def get_pipeline(mode: str, client_id: str) -> Pipeline:
     key = (mode, client_id)
