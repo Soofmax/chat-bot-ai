@@ -94,6 +94,34 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+  deploy-pages:
+    runs-on: ubuntu-latest
+    needs: build-test-audit
+    if: ${{ github.event_name != 'pull_request' && hashFiles('dashboard/clients.json') != '' }}
+    permissions:
+      pages: write      # to deploy to Pages
+      id-token: write   # to verify the deployment originates from CI
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download generated dashboards
+        uses: actions/download-artifact@v4
+        with:
+          name: dashboards-dist
+          path: dist
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+      - name: Deploy to GitHub Pages
+        uses: actions/deploy-pages@v4
+
       - name: Prepare lowercase owner
         run: echo "REPO_OWNER_LC=${GITHUB_REPOSITORY_OWNER,,}" >> $GITHUB_ENV
 
