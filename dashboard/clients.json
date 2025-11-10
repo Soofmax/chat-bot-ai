@@ -1,0 +1,12 @@
+[
+  {
+    "brandName": "Showcase Client",
+    "theme": { "accent": "#3b82f6" },
+    "apiUrl": "https://api.example.com",
+    "apiKey": "",
+    "clientId": "showcase_client",
+    "mode": "main",
+    "requestId": "",
+    "debug": true
+  }
+]

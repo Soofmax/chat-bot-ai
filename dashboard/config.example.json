@@ -1,0 +1,14 @@
+{
+  "brandName": "Ma Marque",
+  "theme": {
+    "accent": "#3b82f6",
+    "bg": "#0b0f1a",
+    "card": "#111827",
+    "text": "#e5e7eb",
+    "muted": "#9ca3af"
+  },
+  "apiUrl": "https://api.example.com",
+  "apiKey": "",
+  "clientId": "bms_ventouse",
+  "mode": "main"
+}

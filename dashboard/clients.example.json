@@ -1,0 +1,22 @@
+[
+  {
+    "brandName": "BMS Ventouse",
+    "theme": { "accent": "#22c55e" },
+    "apiUrl": "https://api.mondomaine.com",
+    "apiKey": "key1",
+    "clientId": "bms_ventouse",
+    "mode": "main",
+    "requestId": "",
+    "debug": false
+  },
+  {
+    "brandName": "Studio Lumière",
+    "theme": { "accent": "#3b82f6" },
+    "apiUrl": "https://api.studio.com",
+    "apiKey": "",
+    "clientId": "studio_lumiere",
+    "mode": "alt",
+    "requestId": "",
+    "debug": true
+  }
+]

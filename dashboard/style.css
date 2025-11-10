@@ -1,0 +1,122 @@
+:root {
+  --bg: #0b0f1a;
+  --card: #111827;
+  --text: #e5e7eb;
+  --muted: #9ca3af;
+  --accent: #3b82f6;
+  --danger: #ef4444;
+  --ok: #22c55e;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+}
+
+.container {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+h1 { margin: 0 0 12px; }
+.desc { color: var(--muted); margin-top: 0; }
+
+.card {
+  background: var(--card);
+  border-radius: 12px;
+  padding: 16px;
+  margin: 12px 0;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+label { display: block; font-size: 14px; color: var(--muted); }
+input, select, textarea {
+  width: 100%;
+  margin-top: 6px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #374151;
+  background: #0f172a;
+  color: var(--text);
+}
+
+button {
+  appearance: none;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 16px;
+  background: var(--accent);
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+button:hover { filter: brightness(1.1); }
+
+.hint { display: block; margin-top: 8px; color: var(--muted); }
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+pre {
+  background: #0f172a;
+  border: 1px solid #374151;
+  border-radius: 8px;
+  padding: 12px;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  min-height: 80px;
+}
+
+.meta { margin-top: 8px; color: var(--muted); font-size: 13px; }
+.meta span.code { background: #0f172a; border: 1px solid #374151; border-radius: 6px; padding: 4px 6px; }
+
+.history {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0 0;
+}
+
+.history li {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: center;
+  border: 1px solid #374151;
+  border-radius: 8px;
+  padding: 8px;
+  margin-bottom: 8px;
+  background: #0f172a;
+}
+
+.history .info {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.history .actions {
+  display: flex;
+  gap: 8px;
+  margin: 0;
+}
+
+label.checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}

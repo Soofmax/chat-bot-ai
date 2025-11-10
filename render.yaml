@@ -13,3 +13,13 @@ services:
         value: google/flan-t5-small
       - key: HF_EMBED_MODEL
         value: sentence-transformers/all-MiniLM-L6-v2
+      - key: ALLOWED_ORIGINS
+        value: https://your-frontend.example.com
+      - key: API_KEYS
+        value: change-me
+      - key: RATE_LIMIT_WINDOW_SEC
+        value: "60"
+      - key: RATE_LIMIT_MAX_REQ
+        value: "60"
+      - key: RATE_LIMIT_KEY
+        value: ip

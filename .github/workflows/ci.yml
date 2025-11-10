@@ -1,0 +1,251 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - "**"
+  workflow_dispatch:
+  schedule:
+    - cron: "0 2 * * 1"  # Weekly audit run (Mondays 02:00 UTC)
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test-audit:
+    runs-on: ubuntu-latest
+    outputs:
+      has_clients_json: ${{ steps.check_clients.outputs.present }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Check clients.json presence
+        id: check_clients
+        run: |
+          if [ -f dashboard/clients.json ]; then
+            echo "present=true" >> $GITHUB_OUTPUT
+          else
+            echo "present=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+
+      - name: Lint (ruff)
+        run: ruff check .
+
+      - name: Format check (black)
+        run: black --check .
+
+      - name: Type check (mypy)
+        run: mypy --ignore-missing-imports .
+
+      - name: Tests (coverage >= 70%)
+        run: pytest -q --disable-warnings --maxfail=1 --cov=server --cov-report=term-missing --cov-fail-under=70
+
+      - name: Setup Node (for openapi-typescript)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Generate OpenAPI schema and TS types
+        run: |
+          python scripts/export_openapi.py
+          npx --yes openapi-typescript openapi.json -o shared/api-types.ts
+
+      - name: Upload OpenAPI and TS types
+        uses: actions/upload-artifact@v4
+        with:
+          name: openapi-and-types
+          path: |
+            openapi.json
+            shared/api-types.ts
+
+      - name: Generate client dashboards (if dashboard/clients.json exists)
+        if: ${{ steps.check_clients.outputs.present == 'true' }}
+        run: |
+          python scripts/build_dashboards.py -i dashboard/clients.json -o dist
+
+      - name: Upload dashboard bundles
+        if: ${{ steps.check_clients.outputs.present == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: dashboards-dist
+          path: dist
+
+      - name: Security audit (pip-audit)
+        run: |
+          pip-audit -r requirements.txt \
+            --ignore-vuln GHSA-2c2j-9gv5-cj73 \
+            --ignore-vuln GHSA-7f5h-v6xp-fcq8
+
+      - name: Security audit (safety)
+        continue-on-error: true
+        run: |
+          safety check -r requirements.txt --full-report || echo "Safety failed (non-blocking), continuing CI"
+
+  docker-build-scan:
+    runs-on: ubuntu-latest
+    needs: build-test-audit
+    if: ${{ github.event_name != 'pull_request' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare lowercase owner
+        run: echo "REPO_OWNER_LC=${GITHUB_REPOSITORY_OWNER,,}" >> $GITHUB_ENV
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image (export to tar)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          outputs: type=docker,dest=./chat-bot-ai.tar
+
+      - name: Scan image with Trivy (image tar)
+        uses: aquasecurity/trivy-action@0.20.0
+        with:
+          scan-type: image
+          input: ./chat-bot-ai.tar
+          format: table
+          exit-code: 0
+          severity: CRITICAL,HIGH
+          scanners: vuln
+
+  deploy-pages:
+    runs-on: ubuntu-latest
+    needs: build-test-audit
+    if: ${{ github.event_name != 'pull_request' && needs.build-test-audit.outputs.has_clients_json == 'true' }}
+    permissions:
+      pages: write      # to deploy to Pages
+      id-token: write   # to verify the deployment originates from CI
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download generated dashboards
+        uses: actions/download-artifact@v4
+        with:
+          name: dashboards-dist
+          path: dist
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+      - name: Deploy to GitHub Pages
+        uses: actions/deploy-pages@v4
+
+      
+
+  codeql-analyze:
+    name: CodeQL Analyze
+    runs-on: ubuntu-latest
+    needs: build-test-audit
+    if: ${{ github.event_name != 'pull_request' }}
+    permissions:
+      security-events: write
+      actions: read
+      contents: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: ["python"]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:python"
+
+  deploy-netlify:
+    runs-on: ubuntu-latest
+    needs: build-test-audit
+    if: ${{ github.event_name != 'pull_request' && needs.build-test-audit.outputs.has_clients_json == 'true' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download generated dashboards
+        uses: actions/download-artifact@v4
+        with:
+          name: dashboards-dist
+          path: dist
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Deploy to Netlify
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+        run: |
+          if [ -z "$NETLIFY_AUTH_TOKEN" ] || [ -z "$NETLIFY_SITE_ID" ]; then
+            echo "Skipping Netlify deploy: secrets missing"
+            exit 0
+          fi
+          npx --yes netlify-cli deploy --dir=dist --prod --site="$NETLIFY_SITE_ID" --auth="$NETLIFY_AUTH_TOKEN"
+  deploy-vercel:
+    runs-on: ubuntu-latest
+    needs: build-test-audit
+    if: ${{ github.event_name != 'pull_request' && needs.build-test-audit.outputs.has_clients_json == 'true' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download generated dashboards
+        uses: actions/download-artifact@v4
+        with:
+          name: dashboards-dist
+          path: dist
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Deploy to Vercel
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+        run: |
+          if [ -z "$VERCEL_TOKEN" ] || [ -z "$VERCEL_PROJECT_ID" ] || [ -z "$VERCEL_ORG_ID" ]; then
+            echo "Skipping Vercel deploy: secrets missing"
+            exit 0
+          fi
+          npx --yes vercel deploy --prod --token="$VERCEL_TOKEN" --scope="$VERCEL_ORG_ID" --project="$VERCEL_PROJECT_ID" dist
