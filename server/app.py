@@ -349,14 +349,25 @@ def build_app() -> FastAPI:
     # Middlewares
     app.add_middleware(CorrelationIdMiddleware)
 
-    _allowed = [o.strip() for o in ALLOWED_ORIGINS.split(",")] if ALLOWED_ORIGINS else []
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=_allowed if _allowed else ["*"],
-        allow_credentials=False,
-        allow_methods=["POST", "OPTIONS"],
-        allow_headers=["Content-Type", "Authorization"],
-    )
+    allowed = [o.strip() for o in ALLOWED_ORIGINS.split(",")] if ALLOWED_ORIGINS else []
+    if allowed and allowed != ["*"]:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=allowed,
+            allow_credentials=False,
+            allow_methods=["POST", "OPTIONS"],
+            allow_headers=["Content-Type", "Authorization"],
+        )
+    else:
+        # Fallback: echo Origin dynamiquement via regex, plutôt que "*"
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=[],
+            allow_origin_regex=".*",
+            allow_credentials=False,
+            allow_methods=["POST", "OPTIONS"],
+            allow_headers=["Content-Type", "Authorization"],
+        )
 
     app.add_middleware(SecurityHeadersMiddleware)
 
@@ -380,13 +391,8 @@ def build_app() -> FastAPI:
             if ALLOWED_ORIGINS == "*" or not ALLOWED_ORIGINS.strip():
                 logger.error("ALLOWED_ORIGINS wildcard en production")
                 raise RuntimeError("ALLOWED_ORIGINS doit être une liste d'origines autorisées en production")
-        # Prometheus metrics
-        if HAS_PROM:
-            try:
-                Instrumentator().instrument(app).expose(app)
-                logger.info("Prometheus metrics exposées sur /metrics")
-            except Exception as e:
-                logger.warning(f"Instrumentator non disponible: {e}")
+        # Prometheus metrics: déplacé avant le startup pour éviter l'ajout de middleware après démarrage
+        pass
 
     # Rate limiting: SlowAPI (Redis) si disponible, sinon fallback mémoire
     RL_BUCKETS.clear()
@@ -467,6 +473,15 @@ def build_app() -> FastAPI:
 
     # Inclure le router
     app.include_router(router)
+
+    # Prometheus metrics (avant démarrage)
+    if HAS_PROM:
+        try:
+            Instrumentator().instrument(app).expose(app)
+            logger.info("Prometheus metrics exposées sur /metrics")
+        except Exception as e:
+            logger.warning(f"Instrumentator non disponible: {e}")
+
     return app
 
 # Instance par défaut
