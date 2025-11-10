@@ -82,14 +82,7 @@ jobs:
           exit-code: 0
           severity: CRITICAL,HIGH
 
-      - name: Scan image with Trivy (image)
-        uses: aquasecurity/trivy-action@0.20.0
-        with:
-          scan-type: image
-          image-ref: ghcr.io/${{ env.REPO_OWNER_LC }}/chat-bot-ai:latest
-          format: table
-          exit-code: 0
-          severity: CRITICAL,HIGH
+      
 
   codeql-analyze:
     name: CodeQL Analyze
