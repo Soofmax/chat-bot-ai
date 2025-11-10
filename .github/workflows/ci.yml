@@ -71,13 +71,13 @@ jobs:
         with:
           context: .
           platforms: linux/amd64
-          outputs: type=docker,dest=/tmp/chat-bot-ai.tar
+          outputs: type=docker,dest=./chat-bot-ai.tar
 
       - name: Scan image with Trivy (image tar)
         uses: aquasecurity/trivy-action@0.20.0
         with:
           scan-type: image
-          image-ref: docker-archive:/tmp/chat-bot-ai.tar
+          image-ref: docker-archive:./chat-bot-ai.tar
           format: table
           exit-code: 0
           severity: CRITICAL,HIGH
