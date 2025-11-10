@@ -63,8 +63,33 @@ Le workflow CI génère les bundles si `dashboard/clients.json` existe et peut p
    - Génère `dist/` via `scripts/build_dashboards.py`
    - Publie `dist/` sur Pages (job `deploy-pages`)
 
-### Netlify / Vercel
-- Déployez le contenu de `dist/<clientId>-dashboard` directement.
+### Netlify (CI/CD automatique)
+Le job `deploy-netlify` de la CI déploie `dist/` si les secrets suivants sont configurés:
+- `NETLIFY_AUTH_TOKEN`: token API Netlify
+- `NETLIFY_SITE_ID`: ID du site Netlify (target)
+
+Étapes:
+1. Créez/identifiez un site Netlify (statique) et récupérez `NETLIFY_SITE_ID`.
+2. Ajoutez les secrets dans GitHub (`Settings → Secrets and variables → Actions`).
+3. Poussez sur `main` avec un `dashboard/clients.json`.
+4. La CI:
+   - Bâtit `dist/` (dashboards)
+   - Déploie `dist/` sur Netlify via `netlify-cli`
+
+### Vercel (CI/CD automatique)
+Le job `deploy-vercel` déploie `dist/` si les secrets suivants sont configurés:
+- `VERCEL_TOKEN`: token Vercel
+- `VERCEL_ORG_ID`: organisation Vercel
+- `VERCEL_PROJECT_ID`: projet Vercel cible
+
+Étapes:
+1. Configurez un projet Vercel (statique). Note: vous pouvez créer un projet spécialisé pour les dashboards.
+2. Ajoutez les secrets dans GitHub.
+3. Poussez sur `main` avec `dashboard/clients.json`.
+4. La CI déploie `dist/` avec `vercel deploy --prod`.
+
+### Déploiement manuel
+- Netlify/Vercel: déployez le contenu de `dist/<clientId>-dashboard` directement.
 - Ajoutez un `config.json` spécifique si vous n’utilisez pas les paramètres d’URL.
 
 ## 🧰 Outils inclus

@@ -178,3 +178,56 @@ jobs:
         uses: github/codeql-action/analyze@v3
         with:
           category: "/language:python"
+
+  deploy-netlify:
+    runs-on: ubuntu-latest
+    needs: build-test-audit
+    if: ${{ github.event_name != 'pull_request' && hashFiles('dashboard/clients.json') != '' && secrets.NETLIFY_AUTH_TOKEN != '' && secrets.NETLIFY_SITE_ID != '' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download generated dashboards
+        uses: actions/download-artifact@v4
+        with:
+          name: dashboards-dist
+          path: dist
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Deploy to Netlify
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+        run: |
+          npx --yes netlify-cli deploy --dir=dist --prod --site="$NETLIFY_SITE_ID" --auth="$NETLIFY_AUTH_TOKEN"
+
+  deploy-vercel:
+    runs-on: ubuntu-latest
+    needs: build-test-audit
+    if: ${{ github.event_name != 'pull_request' && hashFiles('dashboard/clients.json') != '' && secrets.VERCEL_TOKEN != '' && secrets.VERCEL_PROJECT_ID != '' && secrets.VERCEL_ORG_ID != '' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download generated dashboards
+        uses: actions/download-artifact@v4
+        with:
+          name: dashboards-dist
+          path: dist
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Deploy to Vercel
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+        run: |
+          npx --yes vercel deploy --prod --token="$VERCEL_TOKEN" --scope="$VERCEL_ORG_ID" --project="$VERCEL_PROJECT_ID" dist
