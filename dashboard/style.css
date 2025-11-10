@@ -85,3 +85,38 @@ pre {
 
 .meta { margin-top: 8px; color: var(--muted); font-size: 13px; }
 .meta span.code { background: #0f172a; border: 1px solid #374151; border-radius: 6px; padding: 4px 6px; }
+
+.history {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0 0;
+}
+
+.history li {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: center;
+  border: 1px solid #374151;
+  border-radius: 8px;
+  padding: 8px;
+  margin-bottom: 8px;
+  background: #0f172a;
+}
+
+.history .info {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.history .actions {
+  display: flex;
+  gap: 8px;
+  margin: 0;
+}
+
+label.checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}

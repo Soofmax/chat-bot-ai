@@ -33,6 +33,13 @@
             <option value="alt">alt</option>
           </select>
         </label>
+        <label>
+          Request ID (optionnel)
+          <input id="requestId" type="text" placeholder="UUID pour corrélation">
+        </label>
+        <label class="checkbox">
+          <input type="checkbox" id="debug"> Activer mode debug (afficher JSON complet)
+        </label>
       </div>
       <div class="actions">
         <button id="saveCfg">Enregistrer la configuration</button>
@@ -59,6 +66,15 @@
       <h2>Résultat</h2>
       <pre id="result"></pre>
       <div id="meta" class="meta"></div>
+    </section>
+
+    <section class="card">
+      <h2>Historique</h2>
+      <div class="actions">
+        <button id="exportHistory">Exporter historique</button>
+        <button id="clearHistory">Effacer historique</button>
+      </div>
+      <ul id="history" class="history"></ul>
     </section>
 
     <footer>

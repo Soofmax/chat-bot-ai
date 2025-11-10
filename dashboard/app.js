@@ -90,6 +90,12 @@
     if (cfg.apiKey) els.apiKey.value = cfg.apiKey;
     if (cfg.clientId) els.clientId.value = cfg.clientId;
     if (cfg.mode) els.mode.value = cfg.mode;
+    if (cfg.requestId) {
+      const ri = document.getElementById("requestId");
+      if (ri) ri.value = cfg.requestId;
+    }
+    const dbg = document.getElementById("debug");
+    if (dbg && typeof cfg.debug === "boolean") dbg.checked = !!cfg.debug;
 
     // theme + brand
     applyTheme(cfg.theme || {});
@@ -101,11 +107,15 @@
   }
 
   els.saveCfg.addEventListener("click", () => {
+    const riEl = document.getElementById("requestId");
+    const dbgEl = document.getElementById("debug");
     const newCfg = {
       apiUrl: els.apiUrl.value.trim(),
       apiKey: els.apiKey.value.trim(),
       clientId: els.clientId.value.trim(),
       mode: els.mode.value,
+      requestId: riEl ? riEl.value.trim() : "",
+      debug: dbgEl ? !!dbgEl.checked : false,
     };
     const prev = JSON.parse(localStorage.getItem("rag_dashboard_cfg") || "{}");
     const merged = deepMerge(prev, newCfg);
@@ -140,6 +150,57 @@
     }
   });
 
+  function addHistory(entry) {
+    const list = JSON.parse(localStorage.getItem("rag_dashboard_history") || "[]");
+    list.unshift(entry);
+    // Limit to last 20
+    localStorage.setItem("rag_dashboard_history", JSON.stringify(list.slice(0, 20)));
+    renderHistory();
+  }
+
+  function renderHistory() {
+    const ul = document.getElementById("history");
+    if (!ul) return;
+    const list = JSON.parse(localStorage.getItem("rag_dashboard_history") || "[]");
+    ul.innerHTML = "";
+    for (const it of list) {
+      const li = document.createElement("li");
+      const info = document.createElement("div");
+      info.className = "info";
+      const rid = it.rid ? ` • rid=${it.rid}` : "";
+      info.textContent = `${new Date(it.ts).toLocaleString()} • ${it.ms}ms • status=${it.status}${rid} • q="${it.question}"`;
+      const actions = document.createElement("div");
+      actions.className = "actions";
+      const copyBtn = document.createElement("button");
+      copyBtn.textContent = "Copier CURL";
+      copyBtn.addEventListener("click", () => {
+        copyCurl(it.url, it.headers, it.body);
+      });
+      actions.appendChild(copyBtn);
+      li.appendChild(info);
+      li.appendChild(actions);
+      ul.appendChild(li);
+    }
+  }
+
+  document.getElementById("clearHistory").addEventListener("click", () => {
+    localStorage.removeItem("rag_dashboard_history");
+    renderHistory();
+    toast("Historique effacé.");
+  });
+
+  document.getElementById("exportHistory").addEventListener("click", () => {
+    const list = localStorage.getItem("rag_dashboard_history") || "[]";
+    const blob = new Blob([list], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "history.json";
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  });
+
+  renderHistory();
+
   els.sendBtn.addEventListener("click", async () => {
     const apiUrl = (els.apiUrl.value || "").trim();
     const apiKey = (els.apiKey.value || "").trim();
@@ -147,6 +208,10 @@
     const mode = els.mode.value;
     const question = (els.question.value || "").trim();
     const refresh = !!els.refresh.checked;
+    const requestIdEl = document.getElementById("requestId");
+    const debugEl = document.getElementById("debug");
+    const requestId = requestIdEl ? requestIdEl.value.trim() : "";
+    const debug = debugEl ? !!debugEl.checked : false;
 
     if (!apiUrl) return toast("Veuillez renseigner l'API Base URL.");
     if (!clientId) return toast("Veuillez renseigner le Client ID.");
@@ -155,6 +220,7 @@
     const body = { question, client_id: clientId, mode, refresh };
     const headers = { "Content-Type": "application/json" };
     if (apiKey) headers["Authorization"] = "Bearer " + apiKey;
+    if (requestId) headers["X-Request-ID"] = requestId;
 
     const url = apiUrl.replace(/\/+$/, "") + "/v1/chat";
 
@@ -168,17 +234,59 @@
       let json;
       try { json = JSON.parse(txt); } catch (_) { json = { raw: txt }; }
 
-      els.meta.innerHTML = `Status: <span class="code">${res.status}</span> — ${ms}ms`;
+      const rid = res.headers.get("X-Request-ID") || "";
 
-      if (res.ok) {
+      els.meta.innerHTML = `Status: <span class="code">${res.status}</span> — ${ms}ms — rid=${rid || "n/a"}`;
+
+      if (res.ok && !debug) {
         els.result.textContent = json.response || txt;
       } else {
         els.result.textContent = JSON.stringify(json, null, 2);
       }
+
+      addHistory({
+        ts: Date.now(),
+        ms,
+        status: res.status,
+        rid,
+        question,
+        url,
+        headers,
+        body,
+        ok: res.ok,
+      });
     } catch (e) {
       els.result.textContent = "Erreur réseau: " + (e && e.message ? e.message : String(e));
     }
   });
+
+  function copyCurl(url, headers, body) {
+    function sq(s) { return `'${String(s).replace(/'/g, `'\\''`)}'`; }
+    const parts = [
+      "curl -X POST",
+      sq(url),
+      "-H 'Content-Type: application/json'",
+    ];
+    if (headers["Authorization"]) {
+      parts.push("-H " + sq(headers["Authorization"]));
+    }
+    if (headers["X-Request-ID"]) {
+      parts.push("-H " + sq(`X-Request-ID: ${headers["X-Request-ID"]}`));
+    }
+    parts.push("-d " + sq(JSON.stringify(body)));
+    const cmd = parts.join(" ");
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(cmd).then(() => toast("CURL copié dans le presse-papiers."));
+    } else {
+      const ta = document.createElement("textarea");
+      ta.value = cmd;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand("copy"); } catch {}
+      ta.remove();
+      toast("CURL copié.");
+    }
+  }
 
   // Copy CURL button
   document.getElementById("copyCurl").addEventListener("click", () => {
