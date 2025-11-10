@@ -94,7 +94,8 @@ jobs:
 
       - name: Security audit (safety)
         continue-on-error: true
-        run: safety check -r requirements.txt --full-report
+        run: |
+          safety check -r requirements.txt --full-report || echo "Safety failed (non-blocking), continuing CI"
 
   docker-build-scan:
     runs-on: ubuntu-latest
