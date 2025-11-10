@@ -8,7 +8,7 @@
 </head>
 <body>
   <main class="container">
-    <h1>Dashboard Client</h1>
+    <h1 id="brandTitle">Dashboard Client</h1>
     <p class="desc">Tester l'API RAG pour un client. Configurez l'URL API, la clé et les paramètres.</p>
 
     <section class="card">
@@ -34,8 +34,15 @@
           </select>
         </label>
       </div>
-      <button id="saveCfg">Enregistrer la configuration</button>
-      <small class="hint">La configuration est sauvegardée dans le navigateur (localStorage).</small>
+      <div class="actions">
+        <button id="saveCfg">Enregistrer la configuration</button>
+        <button id="exportCfg">Exporter config.json</button>
+        <label class="hint">
+          Importer config.json
+          <input id="importCfg" type="file" accept="application/json">
+        </label>
+      </div>
+      <small class="hint">La configuration est sauvegardée dans le navigateur (localStorage). Vous pouvez aussi fournir un fichier config.json dans ce dossier ou via paramètres d'URL.</small>
     </section>
 
     <section class="card">
