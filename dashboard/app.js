@@ -180,6 +180,53 @@
     }
   });
 
+  // Copy CURL button
+  document.getElementById("copyCurl").addEventListener("click", () => {
+    const apiUrl = (els.apiUrl.value || "").trim();
+    const apiKey = (els.apiKey.value || "").trim();
+    const clientId = (els.clientId.value || "").trim();
+    const mode = els.mode.value;
+    const question = (els.question.value || "").trim();
+    const refresh = !!els.refresh.checked;
+
+    if (!apiUrl) return toast("Veuillez renseigner l'API Base URL.");
+    if (!clientId) return toast("Veuillez renseigner le Client ID.");
+    if (!question) return toast("Veuillez saisir une question.");
+
+    const url = apiUrl.replace(/\/+$/, "") + "/v1/chat";
+    const body = { question, client_id: clientId, mode, refresh };
+
+    function sq(s) {
+      return `'${String(s).replace(/'/g, `'\\''`)}'`;
+    }
+
+    const parts = [
+      "curl -X POST",
+      sq(url),
+      "-H 'Content-Type: application/json'",
+    ];
+    if (apiKey) {
+      parts.push(sq(`Authorization: Bearer ${apiKey}`));
+      parts[parts.length - 1] = "-H " + parts[parts.length - 1];
+    }
+    parts.push("-d " + sq(JSON.stringify(body)));
+
+    const cmd = parts.join(" ");
+
+    // Copy to clipboard
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(cmd).then(() => toast("CURL copié dans le presse-papiers."));
+    } else {
+      const ta = document.createElement("textarea");
+      ta.value = cmd;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand("copy"); } catch {}
+      ta.remove();
+      toast("CURL copié.");
+    }
+  });
+
   function toast(msg) {
     // Simple toast
     const el = document.createElement("div");
